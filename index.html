@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanzas Personales Pro V13</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="header-bg">
+        <div class="container d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="fw-bold mb-0"><i class="fas fa-wallet me-2"></i>Control Financiero</h3>
+                <p class="opacity-75 mb-0 small">Deudas, Cobranza e Ingresos</p>
+            </div>
+            <label class="btn btn-light btn-sm text-primary fw-bold shadow-sm">
+                <i class="fas fa-file-excel me-2"></i>Cargar Excel
+                <input type="file" id="excelInput" accept=".xlsx, .xls">
+            </label>
+        </div>
+    </div>
+
+    <div class="container pb-5">
+        
+        <ul class="nav nav-pills nav-fill mb-4 bg-white p-2 rounded-4 shadow-sm" id="myTab" role="tablist">
+            <li class="nav-item">
+                <button class="nav-link active rounded-pill" data-bs-toggle="tab" data-bs-target="#dashboard">
+                    📊 Resumen General
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill" data-bs-toggle="tab" data-bs-target="#cards">
+                    💳 Tarjetas de Crédito
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="nav-link rounded-pill" data-bs-toggle="tab" data-bs-target="#loans">
+                    💰 Nómina y Cobranza
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content">
+            
+            <div class="tab-pane fade show active" id="dashboard">
+                
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="kpi-card kpi-danger">
+                            <i class="fas fa-credit-card kpi-icon-bg text-danger"></i>
+                            <div class="kpi-label">Deuda Total Tarjetas</div>
+                            <div class="money-display text-danger" id="kpi-debt">$0.00</div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Monto a liquidar</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-card kpi-success">
+                            <i class="fas fa-check-circle kpi-icon-bg text-success"></i>
+                            <div class="kpi-label">Crédito Disponible</div>
+                            <div class="money-display text-success" id="kpi-available">$0.00</div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Capacidad de compra</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-card kpi-warning">
+                            <i class="fas fa-hand-holding-usd kpi-icon-bg text-warning"></i>
+                            <div class="kpi-label">Cuentas por Cobrar</div>
+                            <div class="money-display text-warning" id="kpi-loans">$0.00</div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Dinero pendiente de retorno</small>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="kpi-card kpi-primary">
+                            <i class="fas fa-wallet kpi-icon-bg text-primary"></i>
+                            <div class="kpi-label">Liquidez Total</div>
+                            <div class="money-display text-primary" id="kpi-assets">$0.00</div>
+                            <small class="text-muted" style="font-size: 0.75rem;">Efectivo + Bancos + Recuperado</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4">
+                    
+                    <div class="col-lg-8">
+                        <div class="card card-custom p-4 h-100 border-0">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="fw-bold text-dark mb-0">
+                                    <i class="fas fa-chart-pie me-2 text-primary"></i>Distribución de Deuda
+                                </h5>
+                                <span class="badge bg-light text-dark border">Vista Actual</span>
+                            </div>
+                            <div class="chart-container-wrapper">
+                                <canvas id="mainChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="dashboard-table-card p-0 overflow-hidden">
+                            <div class="p-4 border-bottom bg-light">
+                                <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-bolt me-2 text-warning"></i>Estado Rápido</h6>
+                            </div>
+                            <div class="table-responsive flex-grow-1">
+                                <table class="table table-dashboard w-100 mb-0">
+                                    <thead class="bg-white">
+                                        <tr>
+                                            <th class="ps-4 text-muted small fw-bold">TARJETA</th>
+                                            <th class="text-end text-muted small fw-bold">PAGO MES</th> 
+                                            <th class="pe-4 text-end text-muted small fw-bold">DEUDA TOTAL</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="dashboard-table">
+                                        </tbody>
+                                    <tfoot class="bg-light">
+                                        <tr>
+                                            <td class="ps-4 fw-bold text-dark">TOTAL A PAGAR:</td>
+                                            <td class="text-end fw-bold text-danger" id="total-monthly-payment">$0.00</td>
+                                            <td class="pe-4"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <div class="p-3 bg-light border-top text-center">
+                                <small class="text-muted">Actualizado automáticamente</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="cards">
+                <div class="row g-3">
+                    
+                    <div class="col-md-4">
+                        <div class="card card-custom p-4 h-100 border-0 shadow-sm">
+                            <div class="d-flex align-items-center mb-3">
+                                <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-3 text-primary">
+                                    <i class="fas fa-sliders-h fa-lg"></i>
+                                </div>
+                                <div>
+                                    <h6 class="fw-bold mb-0">Panel de Control</h6>
+                                    <small class="text-muted">Gestiona tus movimientos</small>
+                                </div>
+                            </div>
+                            
+                            <hr class="text-muted opacity-25 mb-4">
+                            
+                            <label class="fw-bold small mb-2 text-muted text-uppercase">Seleccionar Tarjeta</label>
+                            
+                            <select id="card-selector" style="display: none;"></select>
+                            
+                            <div class="custom-select-wrapper mb-4" id="custom-card-select">
+                                <div class="custom-select-trigger">
+                                    <span id="custom-select-text">Cargando...</span>
+                                    <div class="arrow"></div>
+                                </div>
+                                <div class="custom-options" id="custom-select-options">
+                                    </div>
+                            </div>
+                            
+                            <button class="btn btn-gradient w-100 rounded-pill py-2 fw-bold mb-3" onclick="openPurchaseModal()">
+                                <i class="fas fa-plus-circle me-2"></i>Registrar Nueva Compra
+                            </button>
+                            
+                            <div class="alert alert-light border-0 bg-light rounded-3 small text-muted d-flex align-items-start mt-auto">
+                                <i class="fas fa-info-circle me-2 mt-1 text-primary"></i>
+                                <div>
+                                    <strong>Nota:</strong> Las compras manuales se suman a las detectadas en tu Excel automáticamente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-8">
+                        <div class="card-visual-container">
+                            
+                            <div class="credit-card-header" id="card-visual-bg">
+                                <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
+                                    <div>
+                                        <div class="card-chip"></div>
+                                        <h5 class="mb-0 fw-bold" id="card-name" style="letter-spacing: 1px;">...</h5>
+                                    </div>
+                                    <i class="fab fa-cc-visa fa-2x opacity-50"></i>
+                                </div>
+                                
+                                <div class="mt-4 position-relative" style="z-index: 2;">
+                                    <div class="row">
+                                        <div class="col-4">
+                                            <div class="card-label">Deuda Total</div>
+                                            <div class="card-money-small" style="font-size: 1.2rem;" id="card-used">$0.00</div>
+                                        </div>
+                                        <div class="col-4 text-center border-start border-end border-white border-opacity-25">
+                                            <div class="card-label text-warning fw-bold">Pago Mensual</div>
+                                            <div class="card-money-big" style="font-size: 1.5rem;" id="card-monthly">$0.00</div>
+                                        </div>
+                                        <div class="col-4 text-end">
+                                            <div class="card-label">Disponible</div>
+                                            <div class="card-money-small" style="font-size: 1.2rem;" id="card-avail">$0.00</div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center mt-2 small opacity-50" id="card-limit">Límite: $0.00</div>
+                                </div>
+
+                                <div class="mt-3 position-relative" style="z-index: 2;">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="opacity-75">Uso de línea</span>
+                                        <span class="fw-bold" id="card-percent-text">0%</span>
+                                    </div>
+                                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.2);">
+                                        <div id="card-progress" class="progress-bar bg-white" role="progressbar" style="width: 0%"></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="p-4 transactions-container">
+                                <div id="credit-balance-alert" class="alert alert-success border-0 bg-success bg-opacity-10 text-success d-flex align-items-center d-none mb-4">
+                                    <i class="fas fa-check-circle fa-lg me-3"></i>
+                                    <div>
+                                        <div class="fw-bold">Saldo a Favor</div>
+                                        <div class="small">Tienes <strong id="credit-balance-amount">$0.00</strong> extra pagados a esta tarjeta.</div>
+                                    </div>
+                                </div>
+
+                                <h6 class="fw-bold text-muted mb-3 small text-uppercase">
+                                    <i class="fas fa-list-ul me-2"></i>Movimientos Registrados
+                                </h6>
+                                
+                                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                                    <table class="table table-fancy w-100 mb-0">
+                                        <thead class="sticky-top">
+                                            <tr>
+                                                <th>Concepto</th>
+                                                <th>Plazo</th>
+                                                <th class="text-end">Monto Original</th>
+                                                <th class="text-end">Por Pagar</th>
+                                                <th class="text-end"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="transactions-body">
+                                            </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="loans">
+                <div class="row g-4">
+                    
+                    <div class="col-lg-6">
+                        
+                        <div class="card card-custom p-4 mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <h5 class="text-danger fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Cuentas por Cobrar</h5>
+                                <button class="btn btn-sm btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addLoanModal">+ Nuevo</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead class="text-muted small text-uppercase"><tr><th>Deudor</th><th class="text-end">Restante</th><th class="text-end">Acción</th></tr></thead>
+                                    <tbody id="loans-body"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <h5 class="text-primary fw-bold mb-3 px-1"><i class="fas fa-wallet me-2"></i>Mis Cuentas de Débito</h5>
+                            <div class="row g-3" id="debit-grid">
+                                </div>
+                        </div>
+
+                        <div class="card card-custom p-4">
+                            <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                <h5 class="text-success fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Efectivo y Activos</h5>
+                                <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="openAssetModal('Cash')">+ Agregar</button>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table align-middle mb-0">
+                                    <thead class="text-muted small text-uppercase"><tr><th>Concepto</th><th class="text-end">Monto</th><th class="text-end"></th></tr></thead>
+                                    <tbody id="assets-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="mt-3 p-3 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 d-flex justify-content-between align-items-center">
+                                <span class="text-success fw-bold text-uppercase small">Total Disponible (Todo)</span>
+                                <span class="fs-4 fw-bold text-success" id="total-assets-sum">$0.00</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card card-custom p-4 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-4">
+                                <h5 class="text-primary fw-bold mb-0"><i class="fas fa-calendar-alt me-2"></i>Ingresos</h5>
+                                <div class="d-flex align-items-center gap-2 bg-light rounded-pill px-2 py-1 border">
+                                    <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                                    <span class="badge bg-success" id="month-label" style="min-width: 100px;">Mes Actual</span>
+                                    <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                                </div>
+                            </div>
+                            
+                            <div class="calendar-wrapper mb-4">
+                                <div class="calendar-header-row mb-2">
+                                    <div>Lun</div><div>Mar</div><div>Mié</div><div>Jue</div><div>Vie</div><div>Sáb</div><div class="text-success fw-bold">Dom</div>
+                                </div>
+                                <div id="calendar-days" class="calendar-grid"></div>
+                            </div>
+                            
+                            <h6 class="fw-bold border-bottom pb-2 mb-3 small text-muted">HISTORIAL DE INGRESOS (MES VISUALIZADO)</h6>
+                            <div style="height: 150px; overflow-y: auto;">
+                                <table class="table table-sm table-borderless small mb-0 align-middle">
+                                    <tbody id="income-list-body"></tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3 pt-3 border-top">
+                                <h2 class="text-success fw-bold mb-0" id="total-income-display">$0.00</h2>
+                                <small class="text-muted">Total Ingresos Visualizados</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addLoanModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0"><h6 class="modal-title fw-bold">Nuevo Deudor</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <input type="text" id="nl-name" class="form-control mb-2" placeholder="Nombre">
+                    <input type="number" id="nl-amount" class="form-control" placeholder="Monto ($)">
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-danger w-100 rounded-pill" onclick="addNewLoan()">Guardar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="payModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 bg-success text-white">
+                    <h6 class="modal-title fw-bold">Registrar Abono</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="pay-label" class="small fw-bold mb-2 text-muted"></p>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="number" id="pay-amount" class="form-control" placeholder="0.00"></div>
+                    <input type="hidden" id="pay-idx">
+                </div>
+                <div class="modal-footer border-top-0">
+                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="submitPay()">Confirmar Pago</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addAssetModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0"><h6 class="modal-title fw-bold text-success">Agregar Activo</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <label class="small text-muted mb-1">Tipo:</label>
+                    <select id="asset-type-select" class="form-select mb-2" onchange="toggleCustomAssetInput()">
+                        <option value="Billetes">💵 Billetes</option><option value="Monedas">🪙 Monedas</option><option value="Beca">🎓 Beca</option><option value="Otro">✏️ Otro (Escribir...)</option>
+                    </select>
+                    <input type="text" id="asset-custom-name" class="form-control mb-2 d-none" placeholder="Nombre del activo...">
+                    <label class="small text-muted mb-1">Monto:</label>
+                    <div class="input-group"><span class="input-group-text">$</span><input type="number" id="asset-amount" class="form-control" placeholder="0.00"></div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0"><button type="button" class="btn btn-success w-100 rounded-pill" onclick="saveNewAsset()">Guardar Dinero</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addDebitModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content modal-content-fancy border-0 shadow">
+                <div class="modal-header-fancy" style="background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%);">
+                    <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
+                        <div>
+                            <h6 class="modal-title fw-bold"><i class="fas fa-university me-2"></i>Nueva Cuenta</h6>
+                            <p class="mb-0 small opacity-75 text-white">Tarjeta de Débito / Banco</p>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                </div>
+                <div class="modal-body p-4">
+                    <label class="small text-muted mb-1 fw-bold">Nombre del Banco</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-landmark text-primary"></i></span>
+                        <input type="text" id="new-debit-name" class="form-control border-start-0" placeholder="Ej. Banorte, Santander...">
+                    </div>
+                    <label class="small text-muted mb-1 fw-bold">Saldo Inicial</label>
+                    <div class="input-group">
+                        <span class="input-group-text bg-white border-end-0"><i class="fas fa-dollar-sign text-success"></i></span>
+                        <input type="number" id="new-debit-balance" class="form-control border-start-0 fw-bold" placeholder="0.00">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn w-100 rounded-pill py-2 fw-bold text-white" style="background: linear-gradient(135deg, #00b4db 0%, #0083b0 100%); box-shadow: 0 4px 15px rgba(0,131,176,0.3);" onclick="saveNewDebit()">Guardar Tarjeta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="calendarModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0"><h6 class="modal-title fw-bold" id="cal-modal-title">...</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <p id="cal-modal-msg" class="small text-muted mb-2"></p>
+                    <div id="cal-modal-input-wrapper" class="d-none"><div class="input-group"><span class="input-group-text">$</span><input type="number" id="cal-modal-amount" class="form-control" placeholder="0.00"></div></div>
+                    <input type="hidden" id="cal-modal-date">
+                </div>
+                <div class="modal-footer border-top-0 pt-0"><button type="button" id="cal-modal-btn" class="btn btn-primary w-100 rounded-pill" onclick="saveCalendarIncome()">Guardar</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0"><h6 class="modal-title fw-bold text-danger">Eliminar Registro</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body text-center">
+                    <div class="mb-3"><i class="fas fa-exclamation-circle text-danger fa-3x"></i></div>
+                    <p class="small text-muted mb-0">¿Estás seguro de eliminar este elemento? Esta acción no se puede deshacer.</p>
+                    <input type="hidden" id="del-type"><input type="hidden" id="del-idx">
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <div class="row w-100 g-2">
+                        <div class="col-6"><button type="button" class="btn btn-light w-100 rounded-pill" data-bs-dismiss="modal">Cancelar</button></div>
+                        <div class="col-6"><button type="button" class="btn btn-danger w-100 rounded-pill" onclick="confirmDelete()">Eliminar</button></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 text-white" id="edit-modal-header"><h6 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Modificar</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+                <div class="modal-body">
+                    <label class="small text-muted mb-1">Nombre / Concepto</label>
+                    <input type="text" id="edit-name" class="form-control mb-3 fw-bold">
+                    <label class="small text-muted mb-1">Cantidad Total ($)</label>
+                    <div class="input-group"><span class="input-group-text bg-light border-end-0"><i class="fas fa-dollar-sign text-muted"></i></span><input type="number" id="edit-amount" class="form-control border-start-0 ps-1 fw-bold" placeholder="0.00"></div>
+                    <input type="hidden" id="edit-type"><input type="hidden" id="edit-idx">
+                </div>
+                <div class="modal-footer border-top-0 pt-0"><button type="button" class="btn w-100 rounded-pill fw-bold text-white" id="edit-save-btn" onclick="saveEdit()">Guardar Cambios</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addPurchaseModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-content-fancy shadow-lg">
+                <div class="modal-header-fancy">
+                    <div class="d-flex justify-content-between align-items-center position-relative" style="z-index: 2;">
+                        <div><h5 class="modal-title fw-bold"><i class="fas fa-shopping-bag me-2"></i>Nueva Compra</h5><p class="mb-0 small opacity-75">Agregando a: <strong id="purchase-card-name" class="text-warning">...</strong></p></div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Concepto / Tienda</label>
+                        <div class="input-group"><span class="input-group-text"><i class="fas fa-tag"></i></span><input type="text" id="new-purch-desc" class="form-control input-modern" placeholder="Ej. Amazon, Walmart..."></div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted mb-1">Monto Total</label>
+                            <div class="input-group"><span class="input-group-text"><i class="fas fa-dollar-sign"></i></span><input type="number" id="new-purch-amount" class="form-control input-modern" placeholder="0.00"></div>
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted mb-1">Plazos</label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
+                                <select id="new-purch-months" class="form-select input-modern" style="border-left: none;">
+                                    <option value="1">Contado</option>
+                                    <option value="3">3 MSI</option><option value="6">6 MSI</option><option value="9">9 MSI</option><option value="12">12 MSI</option><option value="18">18 MSI</option><option value="24">24 MSI</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-gradient w-100 rounded-pill py-2 fw-bold" onclick="savePurchase()"><i class="fas fa-check-circle me-2"></i>Confirmar Gasto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

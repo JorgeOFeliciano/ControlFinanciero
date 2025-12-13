@@ -1,0 +1,446 @@
+/* =========================================
+   1. VARIABLES Y GENERALES
+   ========================================= */
+:root {
+    --bg-color: #f4f7f6;
+    --card-bg: #ffffff;
+    --primary-blue: #0d6efd;
+    --text-dark: #212529;
+    --text-muted: #6c757d;
+    --gradient-header: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+}
+
+body {
+    background-color: var(--bg-color);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: var(--text-dark);
+}
+
+.header-bg {
+    background: var(--gradient-header);
+    color: white;
+    padding: 20px 0;
+    margin-bottom: 30px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+#excelInput { display: none; }
+
+/* =========================================
+   2. TARJETAS Y CONTENEDORES
+   ========================================= */
+.card-custom {
+    border: none;
+    border-radius: 12px;
+    background-color: var(--card-bg);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease;
+}
+
+.card-custom:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+}
+
+.money-display {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+/* =========================================
+   3. BOTONES Y ACCIONES
+   ========================================= */
+.btn-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    transition: all 0.2s;
+}
+
+.btn-icon-pay { background-color: #198754; color: white; }
+.btn-icon-pay:hover { background-color: #146c43; transform: scale(1.1); }
+
+.btn-icon-del { background-color: #e9ecef; color: #6c757d; }
+.btn-icon-del:hover { background-color: #dee2e6; color: #dc3545; }
+
+/* Botones de Navegación (Calendario) */
+.btn-icon-nav {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #555;
+    transition: 0.2s;
+}
+.btn-icon-nav:hover { background-color: #e2e6ea; color: #000; }
+
+/* Botón Gradient Premium */
+.btn-gradient {
+    background: linear-gradient(135deg, #0d6efd 0%, #00d2ff 100%);
+    border: none;
+    color: white;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.3);
+    transition: all 0.3s ease;
+}
+.btn-gradient:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(13, 110, 253, 0.4);
+    color: white;
+}
+
+/* Drag Handle */
+.drag-handle {
+    cursor: grab;
+    color: #adb5bd;
+    margin-right: 10px;
+    font-size: 1rem;
+    transition: color 0.2s;
+}
+.drag-handle:hover { color: #6c757d; }
+.sortable-ghost { background-color: #f8f9fa; opacity: 0.5; }
+
+/* =========================================
+   4. CALENDARIO
+   ========================================= */
+.calendar-wrapper { background: #fff; border-radius: 8px; }
+.calendar-header-row { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; text-align: center; }
+
+.calendar-day {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; border: 1px solid #f0f0f0; cursor: pointer;
+    font-size: 0.9rem; position: relative; background-color: white; transition: background 0.2s;
+}
+
+/* Estados de los días */
+.calendar-day.sunday.past { background-color: #f8d7da; color: #842029; border-color: #f5c6cb; }
+.calendar-day.current-week:not(.past) { background-color: #e8f5e9; border-color: #c8e6c9; color: #1b5e20; font-weight: 600; }
+.calendar-day.sunday.current-week { background-color: #d1e7dd; border-color: #badbcc; color: #0f5132; }
+.calendar-day.future { background-color: #fff3cd; border-color: #ffecb5; color: #856404; cursor: not-allowed; opacity: 0.8; }
+
+/* Indicador de dinero (Punto o Icono) */
+.calendar-day.has-income::after {
+    content: '💵';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 0.6rem;
+}
+
+/* Tooltip al pasar el mouse sobre día con dinero */
+.calendar-day.has-income:hover::before {
+    content: attr(data-amount); /* JS debe inyectar este atributo */
+    position: absolute;
+    bottom: 105%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #212529;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 100;
+    pointer-events: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* =========================================
+   5. TABLAS Y NAVEGACIÓN
+   ========================================= */
+.table-hover tbody tr:hover { background-color: rgba(0,0,0,0.015); }
+
+/* Menú de Navegación "Cápsula" */
+.nav-pills {
+    background: #ffffff;
+    border-radius: 50px;
+    padding: 6px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    border: 1px solid rgba(0,0,0,0.02);
+    display: flex;
+    gap: 5px;
+}
+
+.nav-pills .nav-link {
+    color: #64748b;
+    font-weight: 600;
+    border-radius: 50px;
+    padding: 10px 20px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: transparent;
+    border: 2px solid transparent;
+}
+
+.nav-pills .nav-link:hover {
+    background-color: #f0f4f8;
+    color: #0d6efd;
+    transform: translateY(-2px);
+}
+
+.nav-pills .nav-link.active {
+    background: linear-gradient(135deg, #0d6efd 0%, #00d2ff 100%);
+    color: white;
+    box-shadow: 0 4px 15px rgba(13, 110, 253, 0.35);
+    transform: scale(1.05);
+    border-color: transparent;
+}
+
+/* =========================================
+   6. FORMULARIOS Y MODALES MODERNOS
+   ========================================= */
+.input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+    color: #0d6efd;
+}
+
+.form-control:focus {
+    box-shadow: none;
+    border-color: #86b7fe;
+    background-color: #fff;
+}
+
+.input-modern { border-left: none; }
+.input-modern:focus + .input-group-text,
+.input-group:focus-within .input-group-text {
+    border-color: #86b7fe;
+    background-color: #fff;
+}
+
+/* Modal Header Fancy */
+.modal-header-fancy {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    color: white;
+    border-radius: 15px 15px 0 0;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+}
+.modal-header-fancy::after { content: ''; position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+.modal-header-fancy::before { content: ''; position: absolute; bottom: -30px; left: 20px; width: 60px; height: 60px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+.modal-content-fancy { border-radius: 16px; border: none; overflow: hidden; }
+
+/* =========================================
+   7. SELECTOR DE TARJETAS (CUSTOM)
+   ========================================= */
+.custom-select-wrapper { position: relative; user-select: none; }
+
+.custom-select-trigger {
+    position: relative; display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 15px; font-size: 1rem; font-weight: 600; color: #344767;
+    background: #ffffff; border: 1px solid #e0e0e0; border-radius: 12px;
+    cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s ease;
+}
+.custom-select-trigger:hover { box-shadow: 0 6px 15px rgba(13, 110, 253, 0.15); border-color: #aecbf7; transform: translateY(-1px); }
+
+.custom-options {
+    position: absolute; display: block; top: 110%; left: 0; right: 0;
+    background: #fff; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    border: 1px solid #f0f0f0; overflow: hidden; z-index: 100; opacity: 0; visibility: hidden;
+    pointer-events: none; transform: translateY(-10px); transition: all 0.3s cubic-bezier(0.5, 0, 0, 1.25);
+}
+.custom-select-wrapper.open .custom-options { opacity: 1; visibility: visible; pointer-events: all; transform: translateY(0); }
+
+.custom-option {
+    position: relative; display: flex; align-items: center; padding: 12px 15px;
+    font-size: 0.95rem; color: #555; cursor: pointer; border-bottom: 1px solid #f8f9fa; transition: background 0.2s;
+}
+.custom-option:hover { background-color: #f0f7ff; color: #0d6efd; padding-left: 20px; }
+.custom-option.selected { background-color: #0d6efd; color: #fff; }
+
+.arrow { position: relative; height: 10px; width: 10px; }
+.arrow::before, .arrow::after { content: ""; position: absolute; bottom: 0px; width: 0.15rem; height: 100%; transition: all 0.3s; background-color: #0d6efd; }
+.arrow::before { left: -3px; transform: rotate(-45deg); }
+.arrow::after { left: 3px; transform: rotate(45deg); }
+.open .arrow::before { left: -3px; transform: rotate(45deg); }
+.open .arrow::after { left: 3px; transform: rotate(-45deg); }
+
+/* =========================================
+   8. VISUALIZADOR TARJETA DE CRÉDITO
+   ========================================= */
+.card-visual-container {
+    background: #ffffff; border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden;
+}
+
+.credit-card-header {
+    background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+    padding: 25px; color: white; position: relative; transition: background 0.5s ease;
+}
+.credit-card-header::before { content: ''; position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+.credit-card-header::after { content: ''; position: absolute; bottom: -80px; left: -40px; width: 150px; height: 150px; background: rgba(255,255,255,0.1); border-radius: 50%; }
+
+.card-chip {
+    width: 40px; height: 30px; background: linear-gradient(135deg, #fceabb 0%, #f8b500 100%);
+    border-radius: 5px; margin-bottom: 15px; position: relative; box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.card-label { font-size: 0.75rem; text-transform: uppercase; opacity: 0.8; letter-spacing: 1px; margin-bottom: 2px; }
+.card-money-big { font-size: 2rem; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.card-money-small { font-size: 1.1rem; font-weight: 600; }
+
+.transactions-container { background: #fff; }
+.table-fancy thead th { background-color: #f8f9fa; color: #8898aa; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #e9ecef; padding: 12px; }
+.table-fancy tbody td { padding: 15px 12px; vertical-align: middle; border-bottom: 1px solid #f0f0f0; }
+
+/* =========================================
+   9. MINI TARJETAS DE DÉBITO (WALLET)
+   ========================================= */
+.mini-card {
+    border-radius: 15px;
+    padding: 15px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    min-height: 100px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.mini-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+}
+
+.mini-card::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
+    pointer-events: none;
+}
+
+.mini-card-name { font-size: 0.85rem; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; }
+.mini-card-balance { font-size: 1.4rem; font-weight: 800; }
+
+/* Icono del Chip Simulado */
+.card-chip-icon {
+    width: 35px;
+    height: 25px;
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+    border-radius: 4px;
+    margin-bottom: 10px;
+    opacity: 0.8;
+}
+
+/* Símbolo Contactless */
+.card-contactless {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    opacity: 0.6;
+    font-size: 1.2rem;
+}
+
+.mini-card-add {
+    background: #f8f9fa;
+    border: 2px dashed #dee2e6;
+    color: #adb5bd;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+.mini-card-add:hover { border-color: #0d6efd; color: #0d6efd; background: #fff; }
+
+/* --- DASHBOARD MEJORADO (RESUMEN GENERAL) --- */
+
+/* 1. Contenedor de Gráfica Controlado (Soluciona el estiramiento) */
+.chart-container-wrapper {
+    position: relative;
+    height: 300px; /* Altura FIJA para evitar crecimiento infinito */
+    width: 100%;
+}
+
+/* 2. Tarjetas de KPI (Indicadores Superiores) con estilo "Glass" */
+.kpi-card {
+    background: white;
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    border: 1px solid rgba(0,0,0,0.02);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+}
+
+.kpi-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+}
+
+/* Icono de fondo decorativo */
+.kpi-icon-bg {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    font-size: 5rem;
+    opacity: 0.05;
+    transform: rotate(-15deg);
+}
+
+.kpi-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #6c757d;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+/* Colores específicos para los bordes inferiores */
+.kpi-danger { border-bottom: 4px solid #dc3545; }
+.kpi-success { border-bottom: 4px solid #198754; }
+.kpi-warning { border-bottom: 4px solid #ffc107; }
+.kpi-primary { border-bottom: 4px solid #0d6efd; }
+
+/* 3. Tabla de "Estado Rápido" mejorada */
+.dashboard-table-card {
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05);
+    height: 100%; /* Para igualar altura con la gráfica */
+    display: flex;
+    flex-direction: column;
+}
+
+.table-dashboard tbody tr {
+    transition: background 0.2s;
+}
+.table-dashboard tbody tr:hover {
+    background-color: #f8f9fa;
+}
+.table-dashboard td {
+    padding: 12px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9rem;
+}
+.table-dashboard td:last-child {
+    font-family: 'Consolas', monospace; /* Para que los números alineen mejor */
+    font-weight: 700;
+}
+
+/* COLORES DE BANCOS */
+.bg-nu { background: linear-gradient(135deg, #82269e 0%, #a450c0 100%); }
+.bg-bbva { background: linear-gradient(135deg, #004481 0%, #2dcccd 100%); }
+.bg-mercado { background: linear-gradient(135deg, #009ee3 0%, #00c6fb 100%); }
+.bg-klar { background: linear-gradient(135deg, #000000 0%, #434343 100%); }
+.bg-cashi { background: linear-gradient(135deg, #ff005e 0%, #ff5e9a 100%); }
+.bg-uala { background: linear-gradient(135deg, #ff3333 0%, #ff6b6b 100%); }
+.bg-default { background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%); }
