@@ -469,13 +469,38 @@
                 </div>
                 <div class="modal-body p-4">
                     <div class="mb-3">
-                        <label class="small fw-bold text-muted mb-1">Concepto / Tienda</label>
-                        <div class="input-group"><span class="input-group-text"><i class="fas fa-tag"></i></span><input type="text" id="new-purch-desc" class="form-control input-modern" placeholder="Ej. Amazon, Walmart..."></div>
+                        <label class="small fw-bold text-muted mb-1">Categoría</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-layer-group"></i></span>
+                            <select id="new-purch-cat" class="form-select input-modern" style="border-left: none;">
+                                <option value="General">📦 General / Varios</option>
+                                <option value="Comida">🍔 Comida / Restaurantes</option>
+                                <option value="Super">🛒 Supermercado</option>
+                                <option value="Transporte">⛽ Transporte / Gasolina</option>
+                                <option value="Servicios">💡 Servicios (Luz, Agua, Internet)</option>
+                                <option value="Salud">💊 Salud / Farmacia</option>
+                                <option value="Entretenimiento">🎬 Entretenimiento / Streaming</option>
+                                <option value="Ropa">👕 Ropa / Calzado</option>
+                                <option value="Educacion">📚 Educación</option>
+                            </select>
+                        </div>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="small fw-bold text-muted mb-1">Concepto / Tienda</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-tag"></i></span>
+                            <input type="text" id="new-purch-desc" class="form-control input-modern" placeholder="Ej. Amazon, Walmart...">
+                        </div>
+                    </div>
+                    
                     <div class="row g-3">
                         <div class="col-6">
                             <label class="small fw-bold text-muted mb-1">Monto Total</label>
-                            <div class="input-group"><span class="input-group-text"><i class="fas fa-dollar-sign"></i></span><input type="number" id="new-purch-amount" class="form-control input-modern" placeholder="0.00"></div>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="fas fa-dollar-sign"></i></span>
+                                <input type="number" id="new-purch-amount" class="form-control input-modern" placeholder="0.00">
+                            </div>
                         </div>
                         <div class="col-6">
                             <label class="small fw-bold text-muted mb-1">Plazos</label>
@@ -483,7 +508,12 @@
                                 <span class="input-group-text"><i class="fas fa-calendar-alt"></i></span>
                                 <select id="new-purch-months" class="form-select input-modern" style="border-left: none;">
                                     <option value="1">Contado</option>
-                                    <option value="3">3 MSI</option><option value="6">6 MSI</option><option value="9">9 MSI</option><option value="12">12 MSI</option><option value="18">18 MSI</option><option value="24">24 MSI</option>
+                                    <option value="3">3 MSI</option>
+                                    <option value="6">6 MSI</option>
+                                    <option value="9">9 MSI</option>
+                                    <option value="12">12 MSI</option>
+                                    <option value="18">18 MSI</option>
+                                    <option value="24">24 MSI</option>
                                 </select>
                             </div>
                         </div>
