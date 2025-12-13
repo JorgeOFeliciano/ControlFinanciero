@@ -317,18 +317,18 @@ function updateUI() {
         lb.innerHTML += `<tr><td><div class="d-flex align-items-center"><i class="fas fa-grip-vertical drag-handle me-2"></i><div class="w-100"><div class="fw-bold">${l.name}</div><div class="small text-muted" style="font-size:0.75rem">Orig: ${fmt(l.original)} | Pagado: ${fmt(l.paid)}</div><div class="progress mt-1" style="height: 4px; width: 100%; max-width: 120px; border-radius: 2px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div></div></td><td class="text-end fw-bold text-danger">${fmt(rem)}</td><td class="text-end"><button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('loan',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button>${rem > 0 ? `<button class="btn-icon btn-icon-pay me-1" onclick="openPayModal(${i},'${l.name}')"><i class="fas fa-dollar-sign"></i></button>` : '<span class="badge bg-success me-1">Pagado</span>'}<button class="btn-icon btn-icon-del" onclick="delItem('loan',${i})"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 
-    // DÉBITO (V0.23 CORREGIDO - Solo un botón al final)
+    // DÉBITO (V0.24 - ESPACIO CORREGIDO Y CENTRADO)
     let tDebit = 0; 
     const dGrid = document.getElementById('debit-grid'); 
-    dGrid.innerHTML = ''; // Limpiamos la rejilla
+    dGrid.innerHTML = ''; 
     
     if (!appData.debit) appData.debit = defaultData.debit;
 
-    // 1. EL BUCLE (Dibuja tus tarjetas reales una por una)
+    // 1. EL BUCLE DE TARJETAS
     appData.debit.forEach((d, i) => {
         tDebit += d.balance;
         
-        // --- LÓGICA DE DETECCIÓN DE COLOR Y RED ---
+        // --- TUS ESTILOS DE COLOR Y RED (Se mantienen igual) ---
         let bgStyle = '';
         const n = d.name.toLowerCase();
 
@@ -359,9 +359,10 @@ function updateUI() {
             }
         }
 
-        // DIBUJAR LA TARJETA REAL
+        // --- AQUÍ ESTÁ EL AJUSTE DE TAMAÑO ---
+        // Cambiamos a col-12 (celular) col-sm-6 (tablet) col-lg-4 (pc)
         dGrid.innerHTML += `
-        <div class="col-6 col-md-4">
+        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
             <div class="mini-card text-white" 
                  onclick="openEditModal('debit', ${i})" 
                  style="background: ${bgStyle};">
@@ -376,17 +377,16 @@ function updateUI() {
             </div>
         </div>`;
     }); 
-    // <--- AQUÍ TERMINA EL BUCLE (Cuidado con esta llave)
 
-    // 2. EL BOTÓN "NUEVA TARJETA" (SE PONE UNA SOLA VEZ AFUERA)
+    // Botón Nueva Tarjeta (También ajustado)
     dGrid.innerHTML += `
-    <div class="col-6 col-md-4">
+    <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
         <div class="mini-card mini-card-add h-100" onclick="openDebitModal()">
             <i class="fas fa-plus-circle fa-2x mb-2"></i>
             <span class="small fw-bold">Nueva Tarjeta</span>
         </div>
     </div>`;
-    
+
     // Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
     if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
