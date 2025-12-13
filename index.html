@@ -507,15 +507,112 @@
     </div>
 
     <div class="modal fade" id="calendarModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header border-bottom-0 pb-0"><h6 class="modal-title fw-bold" id="cal-modal-title">...</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <p id="cal-modal-msg" class="small text-muted mb-2"></p>
-                    <div id="cal-modal-input-wrapper" class="d-none"><div class="input-group"><span class="input-group-text">$</span><input type="number" id="cal-modal-amount" class="form-control" placeholder="0.00"></div></div>
-                    <input type="hidden" id="cal-modal-date">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <div>
+                        <h6 class="modal-title fw-bold" id="cal-modal-title">Registrar Ingreso</h6>
+                        <small class="text-muted" id="cal-modal-subtitle">Selecciona el origen del dinero</small>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-light rounded-circle text-secondary" onclick="openSourceManager()" title="Personalizar Fuentes">
+                            <i class="fas fa-cog"></i>
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
                 </div>
-                <div class="modal-footer border-top-0 pt-0"><button type="button" id="cal-modal-btn" class="btn btn-primary w-100 rounded-pill" onclick="saveCalendarIncome()">Guardar</button></div>
+                
+                <div class="modal-body p-4">
+                    <label class="small fw-bold text-muted mb-2">Fuente de Ingreso</label>
+                    
+                    <div class="income-grid" id="income-options-container"></div>
+
+                    <div class="row g-3">
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted mb-1">Monto ($)</label>
+                            <input type="number" id="cal-modal-amount" 
+                                class="form-control fw-bold fs-5 text-success py-2" 
+                                placeholder="0.00">
+                        </div>
+                        
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted mb-1">Depositar en:</label>
+                            <select id="cal-target-account" 
+                                    class="form-select fw-bold text-dark fs-5 py-2">
+                                </select>
+                        </div>
+                    </div>
+
+                    <div class="error-msg-inline text-center mt-3" style="display:none;"></div>
+
+                    <input type="hidden" id="cal-modal-date">
+                    <input type="hidden" id="cal-old-amount" value="0">
+                    <input type="hidden" id="cal-old-link" value="">
+                </div>
+                
+                <div class="modal-footer border-top-0 pt-0 pb-4 px-4 d-flex justify-content-between">
+                    <button type="button" class="btn btn-delete-fancy rounded-pill px-4 d-none" id="btn-delete-income" onclick="deleteCalendarIncome()">
+                        <i class="fas fa-trash-alt me-2"></i>Eliminar
+                    </button>
+                    <button type="button" class="btn btn-success rounded-pill px-4 fw-bold shadow-sm ms-auto" onclick="saveCalendarIncome()">
+                        <i class="fas fa-save me-2"></i>Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="manageSourceModal" tabindex="-1" style="z-index: 1060;">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h6 class="modal-title fw-bold">Nueva Fuente</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="text-center mb-4">
+                        <div class="income-option-label d-inline-flex px-4 py-3 shadow-sm" id="source-preview-box" style="border: 2px solid transparent;">
+                            <i class="fas fa-briefcase fa-lg mb-2" id="source-preview-icon"></i>
+                            <span class="small fw-bold" id="source-preview-text">Nombre</span>
+                        </div>
+                    </div>
+
+                    <label class="small fw-bold text-muted mb-1">Nombre</label>
+                    <input type="text" id="new-source-name" class="form-control mb-3" placeholder="Ej. Cripto, Rentas..." oninput="updateSourcePreview()">
+
+                    <label class="small fw-bold text-muted mb-1">Icono</label>
+                    <div class="d-flex gap-2 justify-content-between mb-3 overflow-auto pb-2">
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-briefcase')"><i class="fas fa-briefcase"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-store')"><i class="fas fa-store"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-laptop-code')"><i class="fas fa-laptop-code"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-gift')"><i class="fas fa-gift"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-chart-line')"><i class="fas fa-chart-line"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-coins')"><i class="fas fa-coins"></i></button>
+                        <button class="btn btn-outline-light text-dark border" onclick="setSourceIcon('fa-home')"><i class="fas fa-home"></i></button>
+                    </div>
+                    <input type="hidden" id="new-source-icon" value="fa-briefcase">
+
+                    <label class="small fw-bold text-muted mb-1">Color</label>
+                    <div class="d-flex gap-1 justify-content-center flex-wrap">
+                        <input type="radio" class="btn-check" name="source-color" id="sc_green" value="#11998e" checked onclick="updateSourcePreview()">
+                        <label class="btn rounded-circle" for="sc_green" style="background: #11998e; width: 30px; height: 30px;"></label>
+                        
+                        <input type="radio" class="btn-check" name="source-color" id="sc_blue" value="#00b4db" onclick="updateSourcePreview()">
+                        <label class="btn rounded-circle" for="sc_blue" style="background: #00b4db; width: 30px; height: 30px;"></label>
+                        
+                        <input type="radio" class="btn-check" name="source-color" id="sc_orange" value="#f12711" onclick="updateSourcePreview()">
+                        <label class="btn rounded-circle" for="sc_orange" style="background: #f12711; width: 30px; height: 30px;"></label>
+                        
+                        <input type="radio" class="btn-check" name="source-color" id="sc_purple" value="#82269e" onclick="updateSourcePreview()">
+                        <label class="btn rounded-circle" for="sc_purple" style="background: #82269e; width: 30px; height: 30px;"></label>
+                        
+                        <input type="radio" class="btn-check" name="source-color" id="sc_dark" value="#343a40" onclick="updateSourcePreview()">
+                        <label class="btn rounded-circle" for="sc_dark" style="background: #343a40; width: 30px; height: 30px;"></label>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-dark w-100 rounded-pill" onclick="saveNewSource()">Crear Fuente</button>
+                </div>
             </div>
         </div>
     </div>

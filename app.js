@@ -2,18 +2,29 @@
 const defaultData = {
     cards: [],
     loans: [],
+    // ACTUALIZADO: Tarjetas iniciales con color y red para el nuevo diseño
     debit: [
-        { name: 'Mercado Pago', balance: 0 },
-        { name: 'Nu', balance: 0 },
-        { name: 'Klar', balance: 0 },
-        { name: 'BBVA', balance: 0 },
-        { name: 'Cashi', balance: 0 },
-        { name: 'Uala', balance: 0 }
+        { name: 'Mercado Pago', balance: 0, color: 'blue', network: 'mastercard' },
+        { name: 'Nu', balance: 0, color: 'purple', network: 'mastercard' },
+        { name: 'Klar', balance: 0, color: 'dark', network: 'mastercard' },
+        { name: 'BBVA', balance: 0, color: 'blue', network: 'visa' },
+        { name: 'Cashi', balance: 0, color: 'pink', network: 'visa' },
+        { name: 'Uala', balance: 0, color: 'red', network: 'mastercard' }
     ],
     assets: [],
     incomes: [],
-    history: [] // NUEVO V0.15: Historial de movimientos
+    history: [],
+
+    incomeSources: [
+        { id: 'salary', label: 'Nómina', icon: 'fa-briefcase', color: '#11998e' },
+        { id: 'sale', label: 'Venta', icon: 'fa-store', color: '#00b4db' },
+        { id: 'freelance', label: 'Extra', icon: 'fa-laptop-code', color: '#f12711' },
+        { id: 'gift', label: 'Regalo', icon: 'fa-gift', color: '#82269e' },
+        { id: 'other', label: 'Otro', icon: 'fa-piggy-bank', color: '#343a40' }
+    ]
 };
+
+
 
 // --- DEFINICIÓN DE GRADIENTES (V0.17.1) ---
 const cardGradients = {
@@ -25,7 +36,25 @@ const cardGradients = {
     'orange': 'linear-gradient(135deg, #f12711, #f5af19)',
     'red': 'linear-gradient(135deg, #cb2d3e, #ef473a)',
     'pink': 'linear-gradient(135deg, #ec008c, #fc6767)',
-    'gold': 'linear-gradient(135deg, #f7971e, #ffd200)'
+    'gold': 'linear-gradient(135deg, #f7971e, #ffd200)',
+
+    'brand_nu': 'linear-gradient(135deg, #82269e 0%, #5d1875 100%)',          // Morado Profundo
+    'brand_bbva': 'linear-gradient(135deg, #004481 0%, #1a2d52 100%)',        // Azul Marino
+    'brand_mercado': 'linear-gradient(135deg, #009ee3 0%, #007eb5 100%)',     // Celeste
+    'brand_santander': 'linear-gradient(135deg, #ec0000 0%, #b30000 100%)',   // Rojo Intenso
+    'brand_cashi': 'linear-gradient(135deg, #ff005e 0%, #d6004f 100%)',       // Rosa Mexicano
+    'brand_uala': 'linear-gradient(135deg, #ff5e5e 0%, #e04545 100%)',        // Coral/Rojo
+    'brand_stori': 'linear-gradient(135deg, #00a5a3 0%, #007a79 100%)',       // Verde Agua
+    'brand_hey': 'linear-gradient(135deg, #000000 0%, #333333 100%)'
+};
+
+// Configuración de tipos de ingreso
+const incomeConfig = {
+    'salary': { color: '#11998e', icon: 'fa-briefcase', label: 'Nómina' },
+    'sale':     { color: '#00b4db', icon: 'fa-store', label: 'Venta' },
+    'freelance':{ color: '#f12711', icon: 'fa-laptop-code', label: 'Extra' },
+    'gift':     { color: '#82269e', icon: 'fa-gift', label: 'Regalo' },
+    'other':    { color: '#343a40', icon: 'fa-piggy-bank', label: 'Otro' }
 };
 
 let appData = JSON.parse(JSON.stringify(defaultData));
@@ -288,57 +317,76 @@ function updateUI() {
         lb.innerHTML += `<tr><td><div class="d-flex align-items-center"><i class="fas fa-grip-vertical drag-handle me-2"></i><div class="w-100"><div class="fw-bold">${l.name}</div><div class="small text-muted" style="font-size:0.75rem">Orig: ${fmt(l.original)} | Pagado: ${fmt(l.paid)}</div><div class="progress mt-1" style="height: 4px; width: 100%; max-width: 120px; border-radius: 2px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div></div></td><td class="text-end fw-bold text-danger">${fmt(rem)}</td><td class="text-end"><button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('loan',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button>${rem > 0 ? `<button class="btn-icon btn-icon-pay me-1" onclick="openPayModal(${i},'${l.name}')"><i class="fas fa-dollar-sign"></i></button>` : '<span class="badge bg-success me-1">Pagado</span>'}<button class="btn-icon btn-icon-del" onclick="delItem('loan',${i})"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 
-    // DÉBITO (Actualizado V0.17)
-    
-    // DÉBITO (V0.17.1 - Híbrido: Personalizado + Legacy)
+    // DÉBITO (V0.23 CORREGIDO - Solo un botón al final)
     let tDebit = 0; 
     const dGrid = document.getElementById('debit-grid'); 
-    dGrid.innerHTML = '';
+    dGrid.innerHTML = ''; // Limpiamos la rejilla
     
+    if (!appData.debit) appData.debit = defaultData.debit;
+
+    // 1. EL BUCLE (Dibuja tus tarjetas reales una por una)
     appData.debit.forEach((d, i) => {
         tDebit += d.balance;
         
-        // 1. Determinar icono de red (si existe)
-        let netIconClass = 'fa-wifi opacity-50'; // Icono por defecto si es vieja
-        if (d.network === 'visa') netIconClass = 'fab fa-cc-visa fa-lg';
-        else if (d.network === 'mastercard') netIconClass = 'fab fa-cc-mastercard fa-lg';
-        else if (d.network === 'amex') netIconClass = 'fab fa-cc-amex fa-lg';
+        // --- LÓGICA DE DETECCIÓN DE COLOR Y RED ---
+        let bgStyle = '';
+        const n = d.name.toLowerCase();
 
-        // 2. Determinar Estilo (LA CLAVE DEL ARREGLO)
-        let cardStyle = '';
-        let cardClasses = 'mini-card text-white'; // Clases base
-
-        // ¿Tiene color personalizado guardado?
-        if (d.color && cardGradients[d.color]) {
-            // SÍ: Usar estilo en línea con el gradiente nuevo
-            cardStyle = `background: ${cardGradients[d.color]}; box-shadow: 0 4px 15px rgba(0,0,0,0.15);`;
+        if (d.color && cardGradients[d.color] && !d.color.startsWith('brand_')) {
+            bgStyle = cardGradients[d.color];
         } else {
-            // NO (es una tarjeta vieja): Usar el sistema antiguo de clases CSS (getBankClass)
-            // Asegúrate de que la función getBankClass siga existiendo en tu código
-            cardClasses += ` ${getBankClass(d.name)}`;
+            if (n.includes('nu')) bgStyle = cardGradients['brand_nu'];
+            else if (n.includes('bbva') || n.includes('bancomer')) bgStyle = cardGradients['brand_bbva'];
+            else if (n.includes('mercado')) bgStyle = cardGradients['brand_mercado'];
+            else if (n.includes('santander')) bgStyle = cardGradients['brand_santander'];
+            else if (n.includes('klar')) bgStyle = cardGradients['dark'];
+            else if (n.includes('cashi')) bgStyle = cardGradients['brand_cashi'];
+            else if (n.includes('uala')) bgStyle = cardGradients['brand_uala'];
+            else if (n.includes('stori')) bgStyle = cardGradients['brand_stori'];
+            else if (n.includes('hey')) bgStyle = 'linear-gradient(135deg, #111 0%, #333 100%)';
+            else if (n.includes('azteca') || n.includes('guardadito')) bgStyle = cardGradients['green'];
+            else if (n.includes('coppel') || n.includes('bancco')) bgStyle = cardGradients['gold'];
+            else bgStyle = cardGradients['blue'];
         }
 
+        let netIconClass = 'fab fa-cc-visa fa-lg';
+        if (d.network) {
+            if (d.network === 'mastercard') netIconClass = 'fab fa-cc-mastercard fa-lg';
+            else if (d.network === 'amex') netIconClass = 'fab fa-cc-amex fa-lg';
+        } else {
+            if (n.includes('nu') || n.includes('mercado') || n.includes('klar') || n.includes('uala')) {
+                netIconClass = 'fab fa-cc-mastercard fa-lg';
+            }
+        }
+
+        // DIBUJAR LA TARJETA REAL
         dGrid.innerHTML += `
         <div class="col-6 col-md-4">
-            <div class="${cardClasses}" 
+            <div class="mini-card text-white" 
                  onclick="openEditModal('debit', ${i})" 
-                 style="${cardStyle}">
-                
-                <div class="d-flex justify-content-between mb-3">
-                     ${d.network ? `<i class="${netIconClass}"></i>` : '<i class="fas fa-wifi opacity-50"></i><div class="card-chip-icon"></div>'}
-                </div>
-                
-                <div class="mini-card-name fw-bold" style="letter-spacing:0.5px;">${d.name}</div>
-                
-                <div class="mt-auto text-end">
-                    <div class="small opacity-75" style="font-size: 0.7rem;">Saldo</div>
-                    <div class="mini-card-balance fw-bold">${fmt(d.balance)}</div>
+                 style="background: ${bgStyle};">
+                <div class="mb-auto opacity-75"><i class="${netIconClass}"></i></div>
+                <div class="d-flex justify-content-between align-items-end w-100">
+                    <div class="mini-card-name fw-bold pe-2" style="letter-spacing:0.5px; overflow:hidden; text-overflow:ellipsis;">${d.name}</div>
+                    <div class="text-end flex-shrink-0">
+                        <div class="small opacity-75" style="font-size: 0.6rem;">Saldo</div>
+                        <div class="mini-card-balance fw-bold">${fmt(d.balance)}</div>
+                    </div>
                 </div>
             </div>
         </div>`;
-    });
-    // Botón agregar
-    dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card mini-card-add h-100" onclick="openDebitModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
+    }); 
+    // <--- AQUÍ TERMINA EL BUCLE (Cuidado con esta llave)
+
+    // 2. EL BOTÓN "NUEVA TARJETA" (SE PONE UNA SOLA VEZ AFUERA)
+    dGrid.innerHTML += `
+    <div class="col-6 col-md-4">
+        <div class="mini-card mini-card-add h-100" onclick="openDebitModal()">
+            <i class="fas fa-plus-circle fa-2x mb-2"></i>
+            <span class="small fw-bold">Nueva Tarjeta</span>
+        </div>
+    </div>`;
+    
     // Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
     if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
@@ -350,10 +398,43 @@ function updateUI() {
     });
 
     // Totales
-    const tInc = appData.incomes.filter(inc => {
+    // E. Ingresos (V0.18 Visual)
+    let tInc = 0; 
+    const il = document.getElementById('income-list-body'); 
+    il.innerHTML = '';
+    
+    const visInc = appData.incomes.filter(inc => {
         const d = new Date(inc.date + 'T00:00:00');
         return d.getMonth() === calendarViewDate.getMonth() && d.getFullYear() === calendarViewDate.getFullYear();
-    }).reduce((acc, curr) => acc + curr.amount, 0);
+    });
+    visInc.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    visInc.forEach(inc => { 
+        tInc += inc.amount; 
+        const type = inc.type || 'other';
+        const cfg = incomeConfig[type] || incomeConfig['other']; // Usa la config global
+        
+        // Formatear fecha corta (Ej: 15 Oct)
+        const dateObj = new Date(inc.date + 'T00:00:00');
+        const dayStr = dateObj.getDate();
+        
+        il.innerHTML += `
+        <tr style="border-bottom: 1px solid #f0f0f0;">
+            <td class="py-2">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3" 
+                         style="width: 32px; height: 32px; background-color: ${cfg.color}20; color: ${cfg.color};">
+                        <i class="fas ${cfg.icon} small"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold text-dark small">${cfg.label}</div>
+                        <div class="text-muted" style="font-size: 0.7rem;">${dayStr} de ${document.getElementById('month-label').innerText.split(' ')[0]}</div>
+                    </div>
+                </div>
+            </td>
+            <td class="text-end fw-bold text-success py-2">${fmt(inc.amount)}</td>
+        </tr>`; 
+    });
 
     document.getElementById('kpi-debt').innerText = fmt(tDebt);
     document.getElementById('kpi-available').innerText = fmt(tLimit - tDebt);
@@ -385,27 +466,74 @@ function openDebitModal() {
 }
 
 function saveNewDebit() { 
-    const name = document.getElementById('new-debit-name').value; 
-    const balance = parseFloat(document.getElementById('new-debit-balance').value); 
+    const name = document.getElementById('new-debit-name').value.trim(); 
+    const balanceVal = document.getElementById('new-debit-balance').value;
+    const balance = parseFloat(balanceVal); 
     const network = document.getElementById('new-debit-network').value;
+    
+    // Obtener color
     const colorRadio = document.querySelector('input[name="card-color"]:checked');
     const color = colorRadio ? colorRadio.value : 'blue';
 
-    if(name && balance >= 0) { 
-        // Guardamos todo el objeto con color y red
+    // Referencias al DOM para la animación de error
+    const modalEl = document.getElementById('addDebitModal');
+    const modalContent = modalEl.querySelector('.modal-content');
+    
+    // Validamos: Nombre no vacío Y balance numérico válido (puede ser 0)
+    if(name && !isNaN(balance) && balance >= 0) { 
+        
+        // --- GUARDADO EXITOSO ---
         appData.debit.push({
             name: name, 
             balance: balance,
-            network: network, // Guardamos 'visa', 'mastercard', etc.
-            color: color      // Guardamos 'blue', 'purple', etc.
+            network: network,
+            color: color
         }); 
+        
         saveData(); 
         updateUI(); 
-        bootstrap.Modal.getInstance(document.getElementById('addDebitModal')).hide(); 
+        
+        // Limpiamos errores previos si los hubo
+        removeErrorVisuals(modalContent);
+        
+        bootstrap.Modal.getInstance(modalEl).hide(); 
         showToast('Tarjeta creada con éxito');
+        
     } else { 
-        alert("Datos inválidos"); 
+        // --- ERROR VISUAL (SIN ALERT) ---
+        
+        // 1. Activar animación de sacudida
+        modalContent.classList.remove('modal-shake'); // Reset por si acaso
+        void modalContent.offsetWidth; // Truco para reiniciar la animación CSS
+        modalContent.classList.add('modal-shake');
+
+        // 2. Mostrar mensaje de error dentro del modal
+        let errorMsg = modalContent.querySelector('.error-msg-inline');
+        
+        // Si no existe el mensaje, lo creamos dinámicamente
+        if (!errorMsg) {
+            errorMsg = document.createElement('div');
+            errorMsg.className = 'error-msg-inline';
+            // Lo insertamos justo antes del footer del modal
+            const modalFooter = modalContent.querySelector('.modal-footer');
+            modalContent.insertBefore(errorMsg, modalFooter);
+        }
+        
+        errorMsg.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Completa el nombre y un monto válido';
+        errorMsg.style.display = 'block';
+
+        // 3. Quitar la animación después de que termine (500ms)
+        setTimeout(() => {
+            modalContent.classList.remove('modal-shake');
+        }, 500);
     } 
+}
+
+// Helper para limpiar el mensaje cuando se cierre o se guarde bien
+function removeErrorVisuals(content) {
+    const msg = content.querySelector('.error-msg-inline');
+    if(msg) msg.style.display = 'none';
+    content.classList.remove('modal-shake');
 }
 
 // --- VISTA PREVIA DE TARJETA ---
@@ -755,10 +883,393 @@ function delItem(type, idx) { document.getElementById('del-type').value = type; 
 function confirmDelete() { const type = document.getElementById('del-type').value; const idx = parseInt(document.getElementById('del-idx').value); if (type === 'loan') appData.loans.splice(idx, 1); else if (type === 'debit') appData.debit.splice(idx, 1); else if (type === 'asset') appData.assets.splice(idx, 1); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide(); }
 
 // --- CALENDARIO Y OTROS ---
-function changeMonth(n) { calendarViewDate.setMonth(calendarViewDate.getMonth() + n); updateUI() }
-function renderCalendar() { const now = new Date(); const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); const cd = today.getDay(); const dist = cd === 0 ? 6 : cd - 1; const mon = new Date(today); mon.setDate(today.getDate() - dist); const sun = new Date(mon); sun.setDate(mon.getDate() + 6); const y = calendarViewDate.getFullYear(); const m = calendarViewDate.getMonth(); const names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]; document.getElementById('month-label').innerText = `${names[m]} ${y}`; const first = new Date(y, m, 1).getDay(); const dim = new Date(y, m + 1, 0).getDate(); const off = first === 0 ? 6 : first - 1; const g = document.getElementById('calendar-days'); g.innerHTML = ''; for (let i = 0; i < off; i++)g.innerHTML += `<div></div>`; for (let i = 1; i <= dim; i++) { const dObj = new Date(y, m, i); const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`; const isSun = dObj.getDay() === 0; const has = appData.incomes.some(x => x.date === iso); const amount = has ? appData.incomes.find(x => x.date === iso).amount : ''; const isPast = dObj < today; const isFuture = dObj > sun; const isCur = dObj >= mon && dObj <= sun; let c = `calendar-day ${has ? 'has-income' : ''} `; if (isSun && isPast) c += 'sunday past '; else if (isSun) c += 'sunday '; if (isCur && !isPast) c += 'current-week '; if (isFuture) c += 'future '; g.innerHTML += `<div class="${c}" data-amount="${fmt(amount)}" onclick="dateClick('${iso}',${isSun},${isPast},${isFuture})">${i}</div>` } }
-function dateClick(d, s, p, f) { if (f) { const m = ["🔮 ¡Aún no viajas en el tiempo!", "🚫 Spoilers no permitidos.", "🧘 Paciencia.", "⏳ El futuro no está escrito."]; const t = document.getElementById('cal-modal-title'); t.innerText = "Futuro Bloqueado"; t.className = "modal-title fw-bold text-warning"; document.getElementById('cal-modal-msg').innerText = m[Math.floor(Math.random() * m.length)]; const b = document.getElementById('cal-modal-btn'); b.innerText = "Entendido"; b.className = "btn btn-warning w-100 rounded-pill text-white"; b.onclick = () => bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide(); document.getElementById('cal-modal-input-wrapper').classList.add('d-none'); new bootstrap.Modal(document.getElementById('calendarModal')).show(); return } const ex = appData.incomes.find(x => x.date === d); if (p) { const t = document.getElementById('cal-modal-title'); t.innerText = `Detalle del ${d}`; t.className = "modal-title fw-bold text-secondary"; document.getElementById('cal-modal-msg').innerHTML = ex ? `✅ Registrado: <strong class="text-success">${fmt(ex.amount)}</strong>` : "⚠️ Nada registrado."; const b = document.getElementById('cal-modal-btn'); b.innerText = "Cerrar"; b.className = "btn btn-secondary w-100 rounded-pill"; b.onclick = () => bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide(); document.getElementById('cal-modal-input-wrapper').classList.add('d-none'); new bootstrap.Modal(document.getElementById('calendarModal')).show() } else { const t = document.getElementById('cal-modal-title'); const w = document.getElementById('cal-modal-input-wrapper'); const i = document.getElementById('cal-modal-amount'); const b = document.getElementById('cal-modal-btn'); document.getElementById('cal-modal-date').value = d; w.classList.remove('d-none'); b.classList.remove('d-none'); t.innerText = s ? "Domingo de Cobro" : "Ingreso Extra"; t.className = s ? "modal-title fw-bold text-success" : "modal-title fw-bold text-primary"; document.getElementById('cal-modal-msg').innerText = `Monto ${d}:`; i.value = ex ? ex.amount : ''; b.innerText = "Guardar"; b.className = "btn btn-primary w-100 rounded-pill"; b.onclick = saveCalendarIncome; new bootstrap.Modal(document.getElementById('calendarModal')).show() } }
-function saveCalendarIncome() { const d = document.getElementById('cal-modal-date').value; const v = parseFloat(document.getElementById('cal-modal-amount').value); if (document.getElementById('cal-modal-amount').value === '') { appData.incomes = appData.incomes.filter(x => x.date !== d) } else if (v > 0) { appData.incomes = appData.incomes.filter(x => x.date !== d); appData.incomes.push({ date: d, amount: v }) } saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide() }
+// --- LÓGICA DE CALENDARIO (V0.18 MEJORADA) ---
+
+// ==========================================
+// 8. BLOQUE MAESTRO: CALENDARIO Y FUENTES (V0.19.1 FIXED)
+// ==========================================
+
+// 1. DIBUJAR EL CALENDARIO PRINCIPAL
+function changeMonth(n) { 
+    calendarViewDate.setMonth(calendarViewDate.getMonth() + n); 
+    updateUI(); 
+}
+
+function renderCalendar() { 
+    const now = new Date(); 
+    const y = calendarViewDate.getFullYear(); 
+    const m = calendarViewDate.getMonth(); 
+    const names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]; 
+    document.getElementById('month-label').innerText = `${names[m]} ${y}`; 
+    
+    const first = new Date(y, m, 1).getDay(); 
+    const dim = new Date(y, m + 1, 0).getDate(); 
+    const off = first === 0 ? 6 : first - 1; 
+    
+    const g = document.getElementById('calendar-days'); 
+    g.innerHTML = ''; 
+    
+    // Asegurar datos iniciales
+    if(!appData.incomeSources || appData.incomeSources.length === 0) {
+        appData.incomeSources = defaultData.incomeSources || [
+            { id: 'salary', label: 'Nómina', icon: 'fa-briefcase', color: '#11998e' },
+            { id: 'other', label: 'Otro', icon: 'fa-piggy-bank', color: '#343a40' }
+        ];
+    }
+
+    for (let i = 0; i < off; i++) g.innerHTML += `<div></div>`; 
+    
+    for (let i = 1; i <= dim; i++) { 
+        const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`; 
+        const incomeData = appData.incomes.find(x => x.date === iso);
+        let content = `${i}`; 
+        let styles = '';
+        
+        if (incomeData) {
+            // BUSCAR LA FUENTE (MEJORA V0.19.2)
+            // Intentamos encontrar la fuente original. Si fue borrada, usamos la PRIMERA de la lista actual.
+            const src = appData.incomeSources.find(s => s.id === incomeData.type) || appData.incomeSources[0]; 
+            
+            // Si por alguna razón extrema no hay fuentes (array vacío), usamos un placeholder gris
+            const color = src ? src.color : '#ccc';
+            const icon = src ? src.icon : 'fa-question-circle';
+
+            content = `
+                <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                    <span style="font-size:0.7rem; opacity:0.8;">${i}</span>
+                    <i class="fas ${icon}" style="color:${color}; font-size:0.9rem;"></i>
+                    <span style="font-size:0.6rem; color:${color}; font-weight:bold;">${fmt(incomeData.amount).split('.')[0]}</span>
+                </div>
+            `;
+            styles = `border: 1px solid ${color}; background-color: rgba(255,255,255,0.9);`;
+        }
+        g.innerHTML += `<div class="calendar-day" style="${styles}" onclick="dateClick('${iso}')">${content}</div>`;
+    } 
+}
+
+// 2. CLIC EN UN DÍA (ABRIR MODAL)
+function dateClick(dateStr) { 
+    // 1. Configuración inicial
+    document.getElementById('cal-modal-date').value = dateStr;
+    const title = document.getElementById('cal-modal-title');
+    const sub = document.getElementById('cal-modal-subtitle');
+    const amountIn = document.getElementById('cal-modal-amount');
+    const deleteBtn = document.getElementById('btn-delete-income');
+    const targetSelect = document.getElementById('cal-target-account');
+    
+    // Referencias de memoria
+    const oldAmtInput = document.getElementById('cal-old-amount');
+    const oldLinkInput = document.getElementById('cal-old-link');
+
+    // Formato Fecha
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    title.innerText = dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    // Llenar Selector
+    targetSelect.innerHTML = '';
+    const groupDebit = document.createElement('optgroup'); groupDebit.label = "Bancos";
+    appData.debit.forEach((d, i) => groupDebit.appendChild(new Option(d.name, `debit_${i}`)));
+    const groupAsset = document.createElement('optgroup'); groupAsset.label = "Efectivo";
+    appData.assets.forEach((a, i) => groupAsset.appendChild(new Option(a.name, `asset_${i}`)));
+    targetSelect.add(groupDebit); targetSelect.add(groupAsset);
+
+    // 2. Buscar datos existentes
+    const existing = appData.incomes.find(x => x.date === dateStr);
+    
+    if (existing) {
+        sub.innerText = "Editar movimiento";
+        amountIn.value = existing.amount;
+        renderIncomeOptions(existing.type);
+        
+        // Guardar memoria para reversión
+        oldAmtInput.value = existing.amount;
+        oldLinkInput.value = existing.linkedAccount || ""; 
+
+        // Seleccionar la cuenta donde se guardó
+        if (existing.linkedAccount) {
+            targetSelect.value = existing.linkedAccount;
+        }
+        
+        deleteBtn.classList.remove('d-none');
+    } else {
+        sub.innerText = "Nuevo ingreso";
+        amountIn.value = '';
+        renderIncomeOptions(); 
+        
+        // Limpiar memoria
+        oldAmtInput.value = "0";
+        oldLinkInput.value = "";
+        
+        deleteBtn.classList.add('d-none');
+    }
+
+    new bootstrap.Modal(document.getElementById('calendarModal')).show();
+    setTimeout(() => amountIn.focus(), 500);
+}
+
+// 3. RENDERIZAR LAS OPCIONES DE FUENTES (Botones de colores)
+function renderIncomeOptions(selectedId = null) {
+    const container = document.getElementById('income-options-container');
+    container.innerHTML = '';
+    
+    if(!appData.incomeSources || appData.incomeSources.length === 0) appData.incomeSources = defaultData.incomeSources;
+
+    appData.incomeSources.forEach((src, index) => {
+        const isChecked = (selectedId === src.id) || (!selectedId && index === 0);
+        const checkedAttr = isChecked ? 'checked' : '';
+        
+        // --- CAMBIO AQUÍ: SIEMPRE TRUE ---
+        // Ahora permitimos borrar cualquiera, siempre que no sea la única que queda
+        const canDelete = appData.incomeSources.length > 1; 
+
+        const html = `
+            <div class="income-option-wrapper">
+                <input type="radio" class="btn-check" name="income-type" id="inc_${src.id}" value="${src.id}" ${checkedAttr} 
+                       onchange="updateSourceStyles()">
+                
+                <label class="income-option-label" for="inc_${src.id}" data-color="${src.color}">
+                    <i class="fas ${src.icon} fa-lg mb-2"></i>
+                    <span class="small fw-bold text-center" style="line-height:1.1">${src.label}</span>
+                </label>
+
+                ${canDelete ? `<div class="btn-delete-source" onclick="deleteSource(${index}, event)" title="Borrar fuente"><i class="fas fa-times"></i></div>` : ''}
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+    });
+    
+    updateSourceStyles();
+}
+
+// 4. FUNCIÓN AUXILIAR DE ESTILOS (CRÍTICA PARA QUE NO DESAPAREZCAN)
+function updateSourceStyles() {
+    const allLabels = document.querySelectorAll('.income-option-label');
+    allLabels.forEach(lbl => {
+        const inputId = lbl.getAttribute('for');
+        const input = document.getElementById(inputId);
+        const color = lbl.getAttribute('data-color');
+        
+        if (input && input.checked) {
+            // Si está seleccionado: Color sólido
+            lbl.style.background = `linear-gradient(135deg, ${color}, ${color})`;
+            lbl.style.color = 'white';
+            lbl.style.borderColor = 'transparent';
+        } else {
+            // Si no: Blanco normal
+            lbl.style.background = 'white';
+            lbl.style.color = '#6c757d';
+            lbl.style.borderColor = '#eee';
+        }
+    });
+}
+
+// 5. GUARDAR INGRESO
+function saveCalendarIncome() { 
+    // Datos del Formulario
+    const dateStr = document.getElementById('cal-modal-date').value;
+    const amountVal = document.getElementById('cal-modal-amount').value;
+    const newAmount = parseFloat(amountVal);
+    const typeRadio = document.querySelector('input[name="income-type"]:checked');
+    const type = typeRadio ? typeRadio.value : 'other';
+    const newTarget = document.getElementById('cal-target-account').value; // Siempre hay uno seleccionado
+
+    // Datos de Memoria (Para reversión inteligente)
+    const oldAmount = parseFloat(document.getElementById('cal-old-amount').value) || 0;
+    const oldLink = document.getElementById('cal-old-link').value;
+
+    const modalEl = document.getElementById('calendarModal');
+    const modalContent = modalEl.querySelector('.modal-content');
+
+    if (newAmount > 0) {
+        
+        // PASO 1: REVERTIR EL PASADO (Si había un registro previo)
+        // Restamos el monto viejo de la cuenta vieja
+        if (oldLink && oldAmount > 0) {
+            const [oldType, oldIdxStr] = oldLink.split('_');
+            const oldIdx = parseInt(oldIdxStr);
+            
+            if (oldType === 'debit' && appData.debit[oldIdx]) {
+                appData.debit[oldIdx].balance -= oldAmount;
+            } else if (oldType === 'asset' && appData.assets[oldIdx]) {
+                appData.assets[oldIdx].amount -= oldAmount;
+            }
+        }
+
+        // PASO 2: APLICAR EL NUEVO (Siempre se ejecuta)
+        const [newType, newIdxStr] = newTarget.split('_');
+        const newIdx = parseInt(newIdxStr);
+        let targetName = "";
+
+        if (newType === 'debit') {
+            appData.debit[newIdx].balance += newAmount;
+            targetName = appData.debit[newIdx].name;
+        } else {
+            appData.assets[newIdx].amount += newAmount;
+            targetName = appData.assets[newIdx].name;
+        }
+        
+        // Log inteligente
+        if(oldAmount > 0) {
+            // Si es edición
+            addLog('ajuste', `Actualización ingreso (${type}) en ${targetName}`, newAmount);
+            showToast(`✅ Saldo actualizado en ${targetName}`);
+        } else {
+            // Si es nuevo
+            addLog('deposito', `Ingreso (${type}) sumado a ${targetName}`, newAmount);
+            showToast(`✅ Ingreso sumado a ${targetName}`);
+        }
+
+        // PASO 3: GUARDAR EL REGISTRO
+        appData.incomes = appData.incomes.filter(x => x.date !== dateStr);
+        
+        appData.incomes.push({ 
+            date: dateStr, 
+            amount: newAmount, 
+            type: type,
+            linkedAccount: newTarget // Siempre guardamos el vínculo
+        });
+        
+        saveData(); 
+        updateUI(); 
+        removeErrorVisuals(modalContent);
+        bootstrap.Modal.getInstance(modalEl).hide(); 
+        
+    } else {
+        // Error visual
+        modalContent.classList.remove('modal-shake'); 
+        void modalContent.offsetWidth; 
+        modalContent.classList.add('modal-shake');
+        const errorMsg = modalContent.querySelector('.error-msg-inline');
+        errorMsg.style.display = 'block';
+        errorMsg.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Ingresa un monto válido';
+        setTimeout(() => modalContent.classList.remove('modal-shake'), 500);
+    }
+}
+// 6. ELIMINAR INGRESO (Y RESTAR SALDO)
+function deleteCalendarIncome() {
+    const dateStr = document.getElementById('cal-modal-date').value;
+    const item = appData.incomes.find(x => x.date === dateStr);
+    
+    if (item) {
+        // Si el ingreso estaba vinculado a una cuenta, LE QUITAMOS EL DINERO
+        if (item.linkedAccount) {
+            const [tType, tIdxStr] = item.linkedAccount.split('_');
+            const tIdx = parseInt(tIdxStr);
+            let accName = "";
+            
+            if (tType === 'debit' && appData.debit[tIdx]) {
+                appData.debit[tIdx].balance -= item.amount;
+                accName = appData.debit[tIdx].name;
+            } else if (tType === 'asset' && appData.assets[tIdx]) {
+                appData.assets[tIdx].amount -= item.amount;
+                accName = appData.assets[tIdx].name;
+            }
+            
+            if(typeof addLog === 'function') {
+                addLog('ajuste', `Ingreso eliminado (Restado de ${accName})`, item.amount);
+            }
+            showToast(`🗑️ Eliminado y restado de ${accName}`);
+        } else {
+            showToast('🗑️ Eliminado del calendario');
+        }
+
+        // Borrar del array
+        appData.incomes = appData.incomes.filter(x => x.date !== dateStr);
+        
+        saveData(); 
+        updateUI(); 
+        bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide(); 
+    }
+}
+// 7. GESTIÓN DE FUENTES PERSONALIZADAS
+function openSourceManager() {
+    bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();
+    document.getElementById('new-source-name').value = '';
+    // Resetear preview
+    document.getElementById('sc_green').checked = true;
+    setSourceIcon('fa-briefcase'); 
+    new bootstrap.Modal(document.getElementById('manageSourceModal')).show();
+}
+
+function setSourceIcon(icon) {
+    document.getElementById('new-source-icon').value = icon;
+    updateSourcePreview();
+}
+
+function updateSourcePreview() {
+    const name = document.getElementById('new-source-name').value || 'Nombre';
+    const icon = document.getElementById('new-source-icon').value;
+    const color = document.querySelector('input[name="source-color"]:checked').value;
+    
+    const box = document.getElementById('source-preview-box');
+    const iconEl = document.getElementById('source-preview-icon');
+    const textEl = document.getElementById('source-preview-text');
+    
+    box.style.background = color;
+    box.style.color = 'white';
+    box.style.borderColor = 'transparent';
+    
+    iconEl.className = `fas ${icon} fa-lg mb-2`;
+    textEl.innerText = name;
+}
+
+function saveNewSource() {
+    const name = document.getElementById('new-source-name').value.trim();
+    const icon = document.getElementById('new-source-icon').value;
+    const color = document.querySelector('input[name="source-color"]:checked').value;
+    
+    if(name) {
+        const id = 'custom_' + Date.now();
+        appData.incomeSources.push({ id, label: name, icon, color });
+        saveData();
+        
+        bootstrap.Modal.getInstance(document.getElementById('manageSourceModal')).hide();
+        
+        // Reabrir calendario
+        const dateStr = document.getElementById('cal-modal-date').value;
+        dateClick(dateStr); 
+        
+        // Seleccionar la nueva
+        setTimeout(() => renderIncomeOptions(id), 300);
+        showToast('Fuente creada');
+    } else {
+        alert("Escribe un nombre");
+    }
+}
+
+function deleteSource(index, event) {
+    event.preventDefault(); 
+    event.stopPropagation(); 
+
+    // --- REGLA DE SEGURIDAD ---
+    if (appData.incomeSources.length <= 1) {
+        alert("⚠️ Debes mantener al menos una fuente de ingreso.");
+        return;
+    }
+
+    if(confirm("¿Seguro que quieres eliminar esta fuente?")) {
+        // Borrar
+        appData.incomeSources.splice(index, 1);
+        saveData();
+        
+        // Determinar nueva selección segura
+        // (Intentamos seleccionar la primera disponible para que no quede nada en el limbo)
+        const firstAvailable = appData.incomeSources[0].id;
+        
+        // Actualizamos vista
+        renderIncomeOptions(firstAvailable);
+        
+        // Actualizamos el preview de estilo también
+        setTimeout(updateSourceStyles, 50);
+        
+        showToast('Fuente eliminada');
+    }
+}
+// Helper para oscurecer un poco el color del gradiente
+function adjustColor(color, amount) {
+    return color; // Simplificación, retorna el mismo para gradiente plano o implementa lógica HEX
+}
+
 function updateSelectors() { const s = document.getElementById('card-selector'); if (s.options.length !== appData.cards.length) { const v = s.value; s.innerHTML = ''; const cOpt = document.getElementById('custom-select-options'); cOpt.innerHTML = ''; appData.cards.forEach((c, i) => { let o = document.createElement('option'); o.value = i; o.text = c.name; s.add(o); let co = document.createElement('span'); co.className = 'custom-option'; if (i == (v || 0)) co.classList.add('selected'); let ic = '<i class="fas fa-credit-card me-2 opacity-50"></i>'; if (c.name.toLowerCase().includes('nu')) ic = '<i class="fas fa-cube me-2 text-primary"></i>'; if (c.name.toLowerCase().includes('mercado')) ic = '<i class="fas fa-handshake me-2 text-info"></i>'; if (c.name.toLowerCase().includes('bbva')) ic = '<i class="fas fa-university me-2 text-primary"></i>'; co.innerHTML = `${ic} ${c.name}`; co.addEventListener('click', function () { s.value = i; document.getElementById('custom-select-text').innerHTML = this.innerHTML; document.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected')); this.classList.add('selected'); document.getElementById('custom-card-select').classList.remove('open'); renderCardDetail(i) }); cOpt.appendChild(co) }); s.value = v || 0; if (appData.cards.length > 0) { const initIdx = v || 0; const ops = cOpt.querySelectorAll('.custom-option'); if (ops[initIdx]) { document.getElementById('custom-select-text').innerHTML = ops[initIdx].innerHTML; ops[initIdx].classList.add('selected') } renderCardDetail(s.value) } } }
 document.querySelector('.custom-select-trigger').addEventListener('click', function () { document.getElementById('custom-card-select').classList.toggle('open') }); window.addEventListener('click', function (e) { const s = document.getElementById('custom-card-select'); if (!s.contains(e.target)) s.classList.remove('open') });
 function renderCardDetail(i) {

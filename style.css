@@ -295,39 +295,44 @@ body {
 /* =========================================
    9. MINI TARJETAS DE DÉBITO (WALLET)
    ========================================= */
+/* ESTILO ÚNICO DE TARJETA (TIPO "HEY") */
 .mini-card {
-    border-radius: 15px;
-    padding: 15px;
-    color: white;
-    position: relative;
-    overflow: hidden;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    min-height: 100px;
+    width: 100%;
+    aspect-ratio: 1.58/1; /* Proporción rectangular */
+    min-height: 110px;
+    
+    border-radius: 16px;
+    padding: 16px;
+    
+    /* Distribución interna */
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: space-between; /* Separa logo del resto */
+    align-items: flex-start;
+    
+    position: relative;
+    cursor: pointer;
+    transition: all 0.2s ease;
     box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    overflow: hidden; /* Para mantener todo dentro */
 }
 
 .mini-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 20px rgba(0,0,0,0.15) !important;
+    z-index: 2;
 }
 
-.mini-card::after {
-    content: '';
-    position: absolute;
-    top: -50%;
-    left: -50%;
-    width: 200%;
-    height: 200%;
-    background: radial-gradient(circle, rgba(255,255,255,0.2) 0%, transparent 60%);
-    pointer-events: none;
+.mini-card-name {
+    font-size: 0.85rem;
+    white-space: nowrap;
 }
 
-.mini-card-name { font-size: 0.85rem; font-weight: 600; opacity: 0.9; text-transform: uppercase; letter-spacing: 0.5px; }
-.mini-card-balance { font-size: 1.4rem; font-weight: 800; }
+.mini-card-balance {
+    font-size: 1.3rem;
+    line-height: 1;
+}
 
 /* Icono del Chip Simulado */
 .card-chip-icon {
@@ -469,6 +474,110 @@ body.privacy-active #total-income-display {
 .btn-check:checked + label {
     box-shadow: 0 0 0 2px white, 0 0 0 4px #333 !important; /* Doble borde para contraste */
     transform: scale(1.05);
+}
+
+/* Animación de error para modales */
+@keyframes shakeError {
+    0% { transform: translateX(0); border-color: transparent; }
+    25% { transform: translateX(-10px); border-color: #dc3545; box-shadow: 0 0 15px rgba(220, 53, 69, 0.3); }
+    50% { transform: translateX(10px); border-color: #dc3545; }
+    75% { transform: translateX(-10px); border-color: #dc3545; }
+    100% { transform: translateX(0); border-color: transparent; }
+}
+
+.modal-shake {
+    animation: shakeError 0.5s ease-in-out;
+}
+
+/* Estilo para el mensaje de error interno */
+.error-msg-inline {
+    color: #dc3545;
+    font-weight: bold;
+    font-size: 0.9rem;
+    margin-top: 10px;
+    text-align: center;
+    display: none; /* Oculto por defecto */
+}
+
+/* GRID DE OPCIONES DE INGRESO (Más espacioso y uniforme) */
+.income-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); /* 3 columnas iguales */
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.income-option-wrapper {
+    position: relative;
+    height: 100%;
+}
+
+.income-option-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #f0f0f0;
+    border-radius: 12px;
+    padding: 15px 5px; /* Más padding vertical */
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #6c757d;
+    height: 100%; /* Para que todos tengan la misma altura */
+    background: white;
+}
+
+.income-option-label:hover { background-color: #f8f9fa; transform: translateY(-2px); }
+
+.btn-check:checked + .income-option-label {
+    border-color: transparent; color: white;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.15); transform: translateY(-3px);
+}
+
+/* Botón de borrar fuente (X pequeña) */
+.btn-delete-source {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: white;
+    color: #dc3545;
+    border: 1px solid #dc3545;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 10;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    transition: transform 0.2s;
+}
+.btn-delete-source:hover {
+    background: #dc3545;
+    color: white;
+    transform: scale(1.1);
+}
+
+/* BOTÓN DE BORRAR ESTILIZADO */
+.btn-delete-fancy {
+    border: 2px solid #ff4d4d;
+    color: #ff4d4d;
+    background: transparent;
+    font-weight: bold;
+    transition: all 0.3s;
+}
+.btn-delete-fancy:hover {
+    background: #ff4d4d;
+    color: white;
+}
+
+/* Estilo para el día en el calendario con ingreso */
+.calendar-day.has-income {
+    background-color: #e8f5e9; /* Fondo suave por defecto */
+    font-weight: bold;
+    border: 1px solid #c8e6c9;
 }
 
 
