@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Finanzas Personales Pro V13</title>
+    <title>Finanzas Personales Pro V15</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -23,6 +23,10 @@
                     
                     <button class="btn btn-header btn-sm" onclick="togglePrivacy()" title="Ocultar/Mostrar Montos">
                         <i class="fas fa-eye" id="privacy-icon"></i>
+                    </button>
+
+                    <button class="btn btn-header btn-sm" onclick="openHistoryModal()" title="Historial de Movimientos">
+                        <i class="fas fa-history"></i>
                     </button>
 
                     <button class="btn btn-header btn-sm" onclick="downloadBackup()" title="Guardar Respaldo (JSON)">
@@ -183,6 +187,10 @@
                             <button class="btn btn-gradient w-100 rounded-pill py-2 fw-bold mb-3" onclick="openPurchaseModal()">
                                 <i class="fas fa-plus-circle me-2"></i>Registrar Nueva Compra
                             </button>
+
+                            <button class="btn btn-outline-success w-100 rounded-pill py-2 fw-bold mb-3" onclick="openPayCardModal()">
+                                <i class="fas fa-money-bill-wave me-2"></i>Pagar Tarjeta
+                            </button>
                             
                             <div class="alert alert-light border-0 bg-light rounded-3 small text-muted d-flex align-items-start mt-auto">
                                 <i class="fas fa-info-circle me-2 mt-1 text-primary"></i>
@@ -295,7 +303,12 @@
                         <div class="card card-custom p-4">
                             <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                                 <h5 class="text-success fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Efectivo y Activos</h5>
-                                <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="openAssetModal('Cash')">+ Agregar</button>
+                                <div>
+                                    <button class="btn btn-sm btn-outline-primary rounded-pill px-2 me-1" onclick="openDepositModal()" title="Depositar a Banco">
+                                        <i class="fas fa-exchange-alt"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="openAssetModal('Cash')">+ Agregar</button>
+                                </div>
                             </div>
                             <div class="table-responsive">
                                 <table class="table align-middle mb-0">
@@ -462,17 +475,80 @@
     </div>
 
     <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog modal-dialog-centered modal-sm">
-            <div class="modal-content border-0 shadow">
-                <div class="modal-header border-bottom-0 text-white" id="edit-modal-header"><h6 class="modal-title fw-bold"><i class="fas fa-edit me-2"></i>Modificar</h6><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-                <div class="modal-body">
-                    <label class="small text-muted mb-1">Nombre / Concepto</label>
-                    <input type="text" id="edit-name" class="form-control mb-3 fw-bold">
-                    <label class="small text-muted mb-1">Cantidad Total ($)</label>
-                    <div class="input-group"><span class="input-group-text bg-light border-end-0"><i class="fas fa-dollar-sign text-muted"></i></span><input type="number" id="edit-amount" class="form-control border-start-0 ps-1 fw-bold" placeholder="0.00"></div>
-                    <input type="hidden" id="edit-type"><input type="hidden" id="edit-idx">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                
+                <div class="modal-header border-bottom-0 text-white" id="edit-modal-header" style="background: #333;">
+                    <div>
+                        <h6 class="modal-title fw-bold mb-0"><i class="fas fa-cog me-2"></i>Gestionar Cuenta</h6>
+                        <small class="opacity-75" style="font-size: 0.75rem;">Edición y Opciones</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
-                <div class="modal-footer border-top-0 pt-0"><button type="button" class="btn w-100 rounded-pill fw-bold text-white" id="edit-save-btn" onclick="saveEdit()">Guardar Cambios</button></div>
+
+                <div class="modal-body p-4">
+                    
+                    <label class="small text-muted fw-bold mb-1">Nombre</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-signature text-muted"></i></span>
+                        <input type="text" id="edit-name" class="form-control fw-bold border-start-0">
+                    </div>
+
+                    <label class="small text-muted fw-bold mb-1">Saldo Total</label>
+                    <div class="input-group mb-4">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-dollar-sign text-muted"></i></span>
+                        <input type="number" id="edit-amount" class="form-control fw-bold fs-5 border-start-0">
+                    </div>
+
+                    <div id="quick-actions-block">
+                        <h6 class="border-bottom pb-2 mb-3 small fw-bold text-primary">OPERACIONES RÁPIDAS</h6>
+                        
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <button class="btn btn-outline-danger w-100 btn-sm" onclick="showQuickInput('-')">
+                                    <i class="fas fa-minus me-1"></i>Retirar
+                                </button>
+                            </div>
+                            <div class="col-6">
+                                <button class="btn btn-outline-success w-100 btn-sm" onclick="showQuickInput('+')">
+                                    <i class="fas fa-plus me-1"></i>Ingresar
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="quick-input-container" class="bg-light p-3 rounded-3 border d-none fade-in-down mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold mb-0 text-dark">Detalles del movimiento:</label>
+                                <button type="button" class="btn-close small" onclick="hideQuickInput()" aria-label="Cerrar"></button>
+                            </div>
+
+                            <select id="quick-context-select" class="form-select form-select-sm mb-2 shadow-sm fw-bold text-secondary">
+                                </select>
+                            
+                            <div class="input-group">
+                                <input type="number" id="quick-amount-val" class="form-control fw-bold" placeholder="0.00">
+                                <button class="btn btn-dark fw-bold" id="quick-apply-btn" onclick="applyQuickInput()">
+                                    Aplicar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-2 border-top">
+                        <button class="btn btn-link text-danger text-decoration-none btn-sm w-100 mt-2" onclick="deleteFromEdit()">
+                            <i class="fas fa-trash-alt me-2"></i>Eliminar esta cuenta permanentemente
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="edit-type">
+                    <input type="hidden" id="edit-idx">
+                </div>
+
+                <div class="modal-footer border-top-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-dark w-100 rounded-pill fw-bold shadow-sm py-2" onclick="saveEdit()">
+                        <i class="fas fa-check-circle me-2"></i>Guardar Todo
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -609,6 +685,127 @@
         </div>
     </div>
 
+    <div class="modal fade" id="payCardModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 bg-success bg-opacity-10">
+                    <h6 class="modal-title fw-bold text-success">
+                        <i class="fas fa-money-bill-wave me-2"></i>Pagar Tarjeta
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-light border small text-muted mb-3">
+                        Pagando a: <strong id="pay-card-target-name" class="text-dark">...</strong>
+                    </div>
+                    
+                    <label class="small fw-bold text-muted mb-1">Origen de Fondos (Débito)</label>
+                    <select id="pay-source-account" class="form-select mb-1 shadow-sm" onchange="calcRemainingBalance()">
+                        </select>
+                    <div class="text-end mb-3">
+                        <small class="text-muted" style="font-size: 0.75rem;">
+                            Saldo final estimado: <span id="pay-remaining-balance" class="fw-bold text-success">---</span>
+                        </small>
+                    </div>
+
+                    <label class="small fw-bold text-muted mb-1">Monto a Pagar</label>
+                    <div class="input-group mb-2">
+                        <span class="input-group-text bg-white text-success fw-bold">$</span>
+                        <input type="number" id="pay-card-amount" class="form-control fw-bold" placeholder="0.00" oninput="calcRemainingBalance()">
+                        
+                        <button class="btn btn-outline-secondary" type="button" onclick="fillFullDebt()">
+                            Liquidar
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-success w-100 rounded-pill fw-bold shadow-sm" onclick="processCardPayment()">
+                        Confirmar Pago
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="depositModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 bg-primary bg-opacity-10">
+                    <h6 class="modal-title fw-bold text-primary">
+                        <i class="fas fa-university me-2"></i>Depositar a Cuenta
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-light border small text-muted mb-3">
+                        Mueve dinero de tus activos físicos (Efectivo) a tus cuentas digitales.
+                    </div>
+                    
+                    <label class="small fw-bold text-muted mb-1">Origen (¿Qué depositas?)</label>
+                    <select id="dep-source-asset" class="form-select mb-3 shadow-sm"></select>
+
+                    <label class="small fw-bold text-muted mb-1">Destino (¿A qué banco va?)</label>
+                    <select id="dep-target-account" class="form-select mb-3 shadow-sm"></select>
+
+                    <label class="small fw-bold text-muted mb-1">Monto a Depositar</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-white text-primary fw-bold">$</span>
+                        <input type="number" id="dep-amount" class="form-control fw-bold" placeholder="0.00">
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm" onclick="processDeposit()">
+                        Confirmar Depósito
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalConfirmarDeposito" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h6 class="modal-title fw-bold text-dark">Confirmación</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-exchange-alt text-primary fa-3x"></i>
+                    </div>
+                    <p id="texto-confirmar-deposito" class="text-muted small fw-bold mb-0">...</p>
+                </div>
+                <div class="modal-footer border-top-0 pt-0 justify-content-center pb-4">
+                    <div class="row w-100 g-2">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-light w-100 rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-primary w-100 rounded-pill" onclick="ejecutarDepositoReal()">Sí, Depositar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="historyModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0">
+                    <h6 class="modal-title fw-bold"><i class="fas fa-history me-2"></i>Últimos Movimientos</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="history-list-body" class="p-3">
+                        </div>
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <button type="button" class="btn btn-light w-100 rounded-pill btn-sm" data-bs-dismiss="modal">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
         <div id="liveToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">

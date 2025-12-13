@@ -1,4 +1,4 @@
-// --- ESTADO GLOBAL ---
+// --- ESTADO GLOBAL (V0.15) ---
 const defaultData = {
     cards: [],
     loans: [],
@@ -11,16 +11,20 @@ const defaultData = {
         { name: 'Uala', balance: 0 }
     ],
     assets: [],
-    incomes: []
+    incomes: [],
+    history: [] // NUEVO V0.15: Historial de movimientos
 };
 
 let appData = JSON.parse(JSON.stringify(defaultData));
 let myChart = null;
 let calendarViewDate = new Date();
+let depositoPendiente = null; // Variable temporal para depósitos
+let pendingActionCallback = null; // Variable temporal para confirmaciones generales
+
 
 const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 
-// --- INICIALIZACIÓN SORTABLE (Drag & Drop) ---
+// --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Préstamos
     new Sortable(document.getElementById('loans-body'), {
@@ -66,6 +70,80 @@ document.addEventListener('DOMContentLoaded', () => {
     updateUI();
 });
 
+// --- SISTEMA DE LOGS (HISTORIAL V0.15) ---
+function addLog(tipo, mensaje, monto) {
+    if (!appData.history) appData.history = []; // Inicializar si no existe
+
+    const fecha = new Date().toLocaleString('es-MX', {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+
+    appData.history.unshift({
+        date: fecha,
+        type: tipo, // 'pago' o 'deposito'
+        msg: mensaje,
+        amount: monto
+    });
+
+    if (appData.history.length > 50) appData.history.pop();
+}
+
+function openHistoryModal() {
+    const listBody = document.getElementById('history-list-body');
+    listBody.innerHTML = '';
+
+    if (!appData.history || appData.history.length === 0) {
+        listBody.innerHTML = '<div class="text-center text-muted p-4">No hay movimientos registrados.</div>';
+    } else {
+        appData.history.forEach(h => {
+            let icon = '';
+            let color = 'text-dark';
+
+            if (h.type === 'pago') {
+                icon = '<div class="bg-danger bg-opacity-10 p-2 rounded-circle me-3"><i class="fas fa-arrow-up text-danger"></i></div>';
+                color = 'text-danger';
+            } else {
+                icon = '<div class="bg-success bg-opacity-10 p-2 rounded-circle me-3"><i class="fas fa-arrow-down text-success"></i></div>';
+                color = 'text-success';
+            }
+
+            listBody.innerHTML += `
+                <div class="d-flex align-items-center border-bottom py-2">
+                    ${icon}
+                    <div class="w-100">
+                        <div class="fw-bold small">${h.msg}</div>
+                        <div class="text-muted" style="font-size: 0.75rem;">${h.date}</div>
+                    </div>
+                    <div class="fw-bold ${color}">${fmt(h.amount)}</div>
+                </div>
+            `;
+        });
+    }
+    new bootstrap.Modal(document.getElementById('historyModal')).show();
+}
+
+// --- HERRAMIENTAS DE CONFIRMACIÓN GENERAL ---
+function askConfirmation(message, callback) {
+    pendingActionCallback = callback;
+    document.getElementById('confirm-msg-text').innerHTML = message;
+    // Usamos el mismo modal de confirmación para todo
+    new bootstrap.Modal(document.getElementById('confirmActionModal')).show();
+}
+
+// Se ejecuta al dar clic en "Sí, continuar" en el modal genérico
+function executePendingAction() {
+    if (pendingActionCallback) {
+        pendingActionCallback();
+        pendingActionCallback = null;
+    }
+    // Para el depósito específico que usaba otro modal, también lo cerramos por si acaso
+    bootstrap.Modal.getInstance(document.getElementById('confirmActionModal')).hide();
+
+    // Si estábamos usando el modal específico de depósito, ejecutamos su lógica
+    if (depositoPendiente) ejecutarDepositoReal();
+}
+
+
 // --- 1. CARGA EXCEL ---
 document.getElementById('excelInput').addEventListener('change', function (e) {
     const file = e.target.files[0];
@@ -76,7 +154,7 @@ document.getElementById('excelInput').addEventListener('change', function (e) {
         if (wb.Sheets['Resumen']) {
             parseResumen(wb.Sheets['Resumen']);
             appData.cards.forEach(c => { if (wb.Sheets[c.name]) parseDetail(c, wb.Sheets[c.name]); });
-            saveData(); updateUI(); alert("¡Datos actualizados!");
+            saveData(); updateUI(); showToast("¡Datos actualizados!");
         }
     };
     reader.readAsArrayBuffer(file);
@@ -104,10 +182,10 @@ function parseResumen(sheet) {
 function parseDetail(card, sheet) {
     const g3 = sheet['G3']; if (g3 && g3.v) card.creditBalance = parseFloat(g3.v) || 0;
     const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, range: 4 });
-    rows.forEach(r => { if (r[0] && typeof r[1] === 'number') card.transactions.push({ desc: r[0], amount: r[1], months: r[2] || 1, paidCycles: r[3] || 0 }); });
+    rows.forEach(r => { if (r[0] && typeof r[1] === 'number') card.transactions.push({ desc: r[0], amount: r[1], months: r[2] || 1, paidCycles: r[3] || 0, category: 'General' }); });
 }
 
-// --- 2. CÁLCULOS ---
+// --- CÁLCULOS ---
 function calcCard(c) {
     let rawDebt = 0;
     let monthlyPay = 0;
@@ -129,16 +207,10 @@ function calcCard(c) {
     let finalDebt = rawDebt - (c.creditBalance || 0);
     if (finalDebt < 0) finalDebt = 0;
 
-    return {
-        debt: finalDebt,
-        raw: rawDebt,
-        avail: c.limit - finalDebt,
-        monthly: monthlyPay
-    };
+    return { debt: finalDebt, raw: rawDebt, avail: c.limit - finalDebt, monthly: monthlyPay };
 }
 
-// --- COLORES ---
-// 1. Para clases CSS (Gradientes)
+// --- UI HELPERS ---
 function getBankClass(name) {
     const n = name.toLowerCase();
     if (n.includes('nu')) return 'bg-nu';
@@ -150,24 +222,21 @@ function getBankClass(name) {
     return 'bg-default';
 }
 
-// 2. Para Chart.js (Colores Sólidos/RGBA) - NUEVA FUNCIÓN
 function getBankColorHex(name) {
     const n = name.toLowerCase();
-    if (n.includes('nu')) return '#82269e'; // Morado Nu
-    if (n.includes('bbva') || n.includes('azul')) return '#004481'; // Azul BBVA
-    if (n.includes('santander')) return '#ec0000'; // Rojo
-    if (n.includes('mercado')) return '#009ee3'; // Azul MP
-    if (n.includes('stori')) return '#00a5a3'; // Verde Stori
-    if (n.includes('amex') || n.includes('oro')) return '#bf953f'; // Dorado
-    if (n.includes('didi')) return '#ff7e00'; // Naranja Didi
-    if (n.includes('rappi')) return '#ff414d'; // Rosa Rappi
-    if (n.includes('klar')) return '#333333'; // Negro Klar
-    if (n.includes('cashi')) return '#ff005e'; // Rosa Cashi
-    if (n.includes('uala')) return '#ff3333'; // Rojo Uala
-    return '#4b6cb7'; // Default Azul
+    if (n.includes('nu')) return '#82269e';
+    if (n.includes('bbva')) return '#004481';
+    if (n.includes('santander')) return '#ec0000';
+    if (n.includes('mercado')) return '#009ee3';
+    if (n.includes('stori')) return '#00a5a3';
+    if (n.includes('didi')) return '#ff7e00';
+    if (n.includes('rappi')) return '#ff414d';
+    if (n.includes('klar')) return '#333333';
+    if (n.includes('cashi')) return '#ff005e';
+    if (n.includes('uala')) return '#ff3333';
+    return '#4b6cb7';
 }
 
-// Helper: Icono de Categoría (NUEVO V0.11)
 function getCategoryIcon(cat) {
     const map = {
         'Comida': '<i class="fas fa-utensils text-warning"></i>',
@@ -183,106 +252,55 @@ function getCategoryIcon(cat) {
     return map[cat] || map['General'];
 }
 
-// --- 3. UI UPDATE ---
+// --- UI UPDATE ---
 function updateUI() {
-    // A. Dashboard - Tabla y Totales
     let tDebt = 0, tLimit = 0, tMonthlyGlobal = 0;
     const dt = document.getElementById('dashboard-table');
     dt.innerHTML = '';
 
     appData.cards.forEach(c => {
         const s = calcCard(c);
-        tDebt += s.debt;
-        tLimit += c.limit;
-        tMonthlyGlobal += s.monthly;
-
-        dt.innerHTML += `
-        <tr>
-            <td class="ps-4">${c.name}</td>
-            <td class="text-end text-primary fw-bold">${fmt(s.monthly)}</td>
-            <td class="pe-4 text-end fw-bold text-dark">${fmt(s.debt)}</td>
-        </tr>`;
+        tDebt += s.debt; tLimit += c.limit; tMonthlyGlobal += s.monthly;
+        dt.innerHTML += `<tr><td class="ps-4">${c.name}</td><td class="text-end text-primary fw-bold">${fmt(s.monthly)}</td><td class="pe-4 text-end fw-bold text-dark">${fmt(s.debt)}</td></tr>`;
     });
 
     const totalMonthEl = document.getElementById('total-monthly-payment');
     if (totalMonthEl) totalMonthEl.innerText = fmt(tMonthlyGlobal);
 
-    // B. Préstamos
+    // Préstamos
     let tLoansRem = 0; let tCollected = 0; const lb = document.getElementById('loans-body'); lb.innerHTML = '';
     appData.loans.forEach((l, i) => {
         let rem = l.original - l.paid; tLoansRem += rem; tCollected += l.paid;
         let percent = l.original > 0 ? (l.paid / l.original) * 100 : 0;
-
-        lb.innerHTML += `
-        <tr>
-            <td>
-                <div class="d-flex align-items-center">
-                    <i class="fas fa-grip-vertical drag-handle me-2"></i>
-                    <div class="w-100">
-                        <div class="fw-bold">${l.name}</div>
-                        <div class="small text-muted" style="font-size:0.75rem">
-                            Orig: ${fmt(l.original)} | Pagado: ${fmt(l.paid)}
-                        </div>
-                        <div class="progress mt-1" style="height: 4px; width: 100%; max-width: 120px; border-radius: 2px;">
-                            <div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </td>
-            <td class="text-end fw-bold text-danger">${fmt(rem)}</td>
-            <td class="text-end">
-                <button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('loan',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button>
-                ${rem > 0 ? `<button class="btn-icon btn-icon-pay me-1" onclick="openPayModal(${i},'${l.name}')"><i class="fas fa-dollar-sign"></i></button>` : '<span class="badge bg-success me-1">Pagado</span>'}
-                <button class="btn-icon btn-icon-del" onclick="delItem('loan',${i})"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>`;
+        lb.innerHTML += `<tr><td><div class="d-flex align-items-center"><i class="fas fa-grip-vertical drag-handle me-2"></i><div class="w-100"><div class="fw-bold">${l.name}</div><div class="small text-muted" style="font-size:0.75rem">Orig: ${fmt(l.original)} | Pagado: ${fmt(l.paid)}</div><div class="progress mt-1" style="height: 4px; width: 100%; max-width: 120px; border-radius: 2px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div></div></td><td class="text-end fw-bold text-danger">${fmt(rem)}</td><td class="text-end"><button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('loan',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button>${rem > 0 ? `<button class="btn-icon btn-icon-pay me-1" onclick="openPayModal(${i},'${l.name}')"><i class="fas fa-dollar-sign"></i></button>` : '<span class="badge bg-success me-1">Pagado</span>'}<button class="btn-icon btn-icon-del" onclick="delItem('loan',${i})"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 
-    // C. DÉBITO
+    // Débito
     let tDebit = 0; const dGrid = document.getElementById('debit-grid'); dGrid.innerHTML = '';
     if (!appData.debit) appData.debit = defaultData.debit;
-
     appData.debit.forEach((d, i) => {
         tDebit += d.balance;
         const colorClass = getBankClass(d.name);
-        dGrid.innerHTML += `
-        <div class="col-6 col-md-4">
-            <div class="mini-card ${colorClass}" onclick="openEditModal('debit', ${i})" title="Clic para editar saldo">
-                <i class="fas fa-wifi card-contactless"></i>
-                <div class="card-chip-icon"></div>
-                <div class="mini-card-name mt-2">${d.name}</div>
-                <div class="mt-auto text-end">
-                    <div class="small opacity-75">Saldo</div>
-                    <div class="mini-card-balance">${fmt(d.balance)}</div>
-                </div>
-            </div>
-        </div>`;
+        dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card ${colorClass}" onclick="openEditModal('debit', ${i})" title="Clic para editar saldo"><i class="fas fa-wifi card-contactless"></i><div class="card-chip-icon"></div><div class="mini-card-name mt-2">${d.name}</div><div class="mt-auto text-end"><div class="small opacity-75">Saldo</div><div class="mini-card-balance">${fmt(d.balance)}</div></div></div></div>`;
     });
     dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card mini-card-add h-100" onclick="openDebitModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
 
-    // D. ACTIVOS
+    // Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
-    if (tCollected > 0) {
-        ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
-    }
-    if (tDebit > 0) {
-        ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-dark"><i class="fas fa-credit-card me-2 text-primary"></i>Saldo en Tarjetas (Débito)</span></div></td><td class="text-end text-success fw-bold">${fmt(tDebit)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
-    }
+    if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
+    if (tDebit > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-dark"><i class="fas fa-credit-card me-2 text-primary"></i>Saldo en Tarjetas (Débito)</span></div></td><td class="text-end text-success fw-bold">${fmt(tDebit)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
+
     appData.assets.forEach((a, i) => {
         tAssets += a.amount;
         ab.innerHTML += `<tr><td><div class="d-flex align-items-center"><i class="fas fa-grip-vertical drag-handle me-2"></i><span class="fw-bold">${a.name}</span></div></td><td class="text-end text-success fw-bold">${fmt(a.amount)}</td><td class="text-end"><button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('asset',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button><button class="btn-icon btn-icon-del" onclick="delItem('asset',${i})"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 
-    // E. Ingresos
-    let tInc = 0; const il = document.getElementById('income-list-body'); il.innerHTML = '';
-    const visInc = appData.incomes.filter(inc => {
+    // Totales
+    const tInc = appData.incomes.filter(inc => {
         const d = new Date(inc.date + 'T00:00:00');
         return d.getMonth() === calendarViewDate.getMonth() && d.getFullYear() === calendarViewDate.getFullYear();
-    });
-    visInc.sort((a, b) => new Date(a.date) - new Date(b.date));
-    visInc.forEach(inc => { tInc += inc.amount; il.innerHTML += `<tr><td><i class="fas fa-calendar-check text-success me-2"></i>${inc.date}</td><td class="text-end fw-bold text-dark">${fmt(inc.amount)}</td></tr>`; });
+    }).reduce((acc, curr) => acc + curr.amount, 0);
 
-    // F. Totales
     document.getElementById('kpi-debt').innerText = fmt(tDebt);
     document.getElementById('kpi-available').innerText = fmt(tLimit - tDebt);
     document.getElementById('kpi-loans').innerText = fmt(tLoansRem);
@@ -294,67 +312,321 @@ function updateUI() {
     renderCalendar(); updateSelectors(); updateChart();
 }
 
-// --- ACTUALIZACIÓN GRÁFICA (COLORES DINÁMICOS) ---
 function updateChart() {
-    const ctx = document.getElementById('mainChart').getContext('2d');
-    if (myChart) myChart.destroy();
-
-    // Generar array de colores basado en los nombres de las tarjetas
-    const bgColors = appData.cards.map(c => getBankColorHex(c.name));
-
-    // Versión con opacidad para el fondo y sólido para el borde
-    const bgColorsAlpha = bgColors.map(c => {
-        // Convertir HEX a RGBA simple (truco rápido para opacidad)
-        // Nota: Para simplicidad usamos el color sólido, ChartJS lo maneja bien.
-        return c;
-    });
-
-    myChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: appData.cards.map(x => x.name),
-            datasets: [{
-                label: 'Deuda Actual',
-                data: appData.cards.map(x => calcCard(x).debt),
-                backgroundColor: bgColorsAlpha, // Colores personalizados
-                borderRadius: 6,
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            if (label) { label += ': '; }
-                            if (context.parsed.y !== null) {
-                                label += new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(context.parsed.y);
-                            }
-                            return label;
-                        }
-                    }
-                }
-            },
-            scales: {
-                y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
-                x: { grid: { display: false } }
-            }
-        }
-    });
+    const c = document.getElementById('mainChart').getContext('2d'); if (myChart) myChart.destroy();
+    const bg = appData.cards.map(c => getBankColorHex(c.name));
+    myChart = new Chart(c, { type: 'bar', data: { labels: appData.cards.map(x => x.name), datasets: [{ label: 'Deuda', data: appData.cards.map(x => calcCard(x).debt), backgroundColor: bg, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } } } })
 }
 
-// --- MODALES ---
+// --- MODALES (Genéricos) ---
 function openDebitModal() { document.getElementById('new-debit-name').value = ''; document.getElementById('new-debit-balance').value = ''; new bootstrap.Modal(document.getElementById('addDebitModal')).show(); }
 function saveNewDebit() { const name = document.getElementById('new-debit-name').value; const balance = parseFloat(document.getElementById('new-debit-balance').value); if (name && balance >= 0) { appData.debit.push({ name: name, balance: balance }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addDebitModal')).hide(); } else { alert("Datos inválidos"); } }
 function openAssetModal(forcedType) { const sel = document.getElementById('asset-type-select'); document.getElementById('asset-custom-name').value = ''; document.getElementById('asset-amount').value = ''; sel.value = 'Billetes'; toggleCustomAssetInput(); new bootstrap.Modal(document.getElementById('addAssetModal')).show(); }
 function toggleCustomAssetInput() { const type = document.getElementById('asset-type-select').value; const input = document.getElementById('asset-custom-name'); if (type === 'Otro') { input.classList.remove('d-none'); input.focus(); } else { input.classList.add('d-none'); } }
 function saveNewAsset() { const type = document.getElementById('asset-type-select').value; let name = type; if (type === 'Otro') { name = document.getElementById('asset-custom-name').value.trim(); if (!name) return; } const amount = parseFloat(document.getElementById('asset-amount').value); if (amount > 0) { const idx = appData.assets.findIndex(a => a.name === name); if (idx >= 0) appData.assets[idx].amount += amount; else appData.assets.push({ name: name, amount: amount }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addAssetModal')).hide(); } }
-function openEditModal(type, idx) { const header = document.getElementById('edit-modal-header'); const btn = document.getElementById('edit-save-btn'); const nameIn = document.getElementById('edit-name'); const amtIn = document.getElementById('edit-amount'); document.getElementById('edit-type').value = type; document.getElementById('edit-idx').value = idx; let item; if (type === 'loan') { item = appData.loans[idx]; header.className = "modal-header border-bottom-0 text-white bg-danger"; btn.className = "btn w-100 rounded-pill fw-bold text-white bg-danger"; nameIn.value = item.name; amtIn.value = item.original; } else if (type === 'debit') { item = appData.debit[idx]; header.className = "modal-header border-bottom-0 text-white bg-primary"; btn.className = "btn w-100 rounded-pill fw-bold text-white bg-primary"; nameIn.value = item.name; amtIn.value = item.balance; } else { item = appData.assets[idx]; header.className = "modal-header border-bottom-0 text-white bg-success"; btn.className = "btn w-100 rounded-pill fw-bold text-white bg-success"; nameIn.value = item.name; amtIn.value = item.amount; } new bootstrap.Modal(document.getElementById('editModal')).show(); }
-function saveEdit() { const type = document.getElementById('edit-type').value; const idx = document.getElementById('edit-idx').value; const name = document.getElementById('edit-name').value; const amt = parseFloat(document.getElementById('edit-amount').value); if (name && amt >= 0) { if (type === 'loan') { appData.loans[idx].name = name; appData.loans[idx].original = amt; } else if (type === 'debit') { appData.debit[idx].name = name; appData.debit[idx].balance = amt; } else { appData.assets[idx].name = name; appData.assets[idx].amount = amt; } saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('editModal')).hide(); } }
+// --- GESTIÓN DEL MODAL DE EDICIÓN (V0.16) ---
+
+function openEditModal(type, idx) {
+    // 1. Obtener referencias a los elementos del NUEVO HTML
+    const header = document.getElementById('edit-modal-header');
+    const nameIn = document.getElementById('edit-name');
+    const amtIn = document.getElementById('edit-amount');
+    
+    // Estos son los IDs clave de la versión Inline
+    const actionsBlock = document.getElementById('quick-actions-block'); 
+    const inputContainer = document.getElementById('quick-input-container');
+
+    // 2. Guardar índices ocultos
+    document.getElementById('edit-type').value = type;
+    document.getElementById('edit-idx').value = idx;
+
+    let item;
+    let colorClass = 'bg-secondary'; 
+
+    // 3. Resetear visualización (Ocultar la cajita de suma/resta por defecto)
+    if(inputContainer) {
+        inputContainer.classList.add('d-none'); 
+        document.getElementById('quick-amount-val').value = ''; 
+    }
+
+    // 4. Lógica según el tipo
+    if (type === 'loan') {
+        item = appData.loans[idx];
+        colorClass = 'bg-danger'; 
+        if(actionsBlock) actionsBlock.classList.add('d-none'); // No mostrar acciones rápidas en préstamos
+        nameIn.value = item.name;
+        amtIn.value = item.original; 
+    } 
+    else if (type === 'debit') {
+        item = appData.debit[idx];
+        colorClass = 'bg-primary'; 
+        if(actionsBlock) actionsBlock.classList.remove('d-none'); // Mostrar acciones
+        nameIn.value = item.name;
+        amtIn.value = item.balance;
+    } 
+    else if (type === 'asset') {
+        item = appData.assets[idx];
+        colorClass = 'bg-success'; 
+        if(actionsBlock) actionsBlock.classList.remove('d-none'); // Mostrar acciones
+        nameIn.value = item.name;
+        amtIn.value = item.amount;
+    }
+
+    // 5. Aplicar estilos y abrir
+    // Nota: Importante mantener el estilo base del header y solo cambiar el color de fondo
+    header.className = `modal-header border-bottom-0 text-white ${colorClass}`;
+    // Si usaste el style="background: #333" en el HTML, esta clase lo sobrescribirá correctamente gracias a CSS de Bootstrap
+    header.style.background = ''; // Limpiamos el estilo inline manual para que la clase CSS mande
+    
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+// --- LÓGICA DE AJUSTE EN LÍNEA (V0.16 INLINE) ---
+
+// --- LÓGICA DE TRANSFERENCIAS RÁPIDAS (V0.16) ---
+
+let currentQuickOp = ''; // '+' o '-'
+
+// 1. Mostrar cajita y llenar el selector inteligentemente
+function showQuickInput(op) {
+    currentQuickOp = op;
+    const container = document.getElementById('quick-input-container');
+    const select = document.getElementById('quick-context-select');
+    const btn = document.getElementById('quick-apply-btn');
+    const input = document.getElementById('quick-amount-val');
+    
+    // Obtenemos qué estamos editando (Débito o Activo)
+    const type = document.getElementById('edit-type').value; 
+    const idx = document.getElementById('edit-idx').value;
+    const currentName = document.getElementById('edit-name').value;
+
+    container.classList.remove('d-none');
+    input.value = '';
+    input.focus();
+    select.innerHTML = ''; // Limpiar opciones anteriores
+
+    // --- CONFIGURACIÓN DE OPCIONES ---
+    
+    // CASO A: RESTAR DINERO (-)
+    if (op === '-') {
+        btn.className = "btn btn-danger fw-bold";
+        btn.innerHTML = '<i class="fas fa-minus"></i> Restar';
+        
+        // Opción 1: Gasto simple (desaparece el dinero)
+        let opt1 = document.createElement('option');
+        opt1.value = 'expense';
+        opt1.text = `💸 Gasto / Pago (Desaparece de ${currentName})`;
+        select.add(opt1);
+
+        // Opciones de Transferencia (A dónde se fue)
+        if (type === 'debit') {
+            // Si es Banco, puede ir a Efectivo
+            appData.assets.forEach((a, i) => {
+                let opt = document.createElement('option');
+                opt.value = `asset_${i}`;
+                opt.text = `📥 Mover a: ${a.name}`;
+                select.add(opt);
+            });
+        } else if (type === 'asset') {
+            // Si es Efectivo, puede ir a Banco
+            appData.debit.forEach((d, i) => {
+                let opt = document.createElement('option');
+                opt.value = `debit_${i}`;
+                opt.text = `🏦 Depositar en: ${d.name}`;
+                select.add(opt);
+            });
+        }
+    } 
+    // CASO B: SUMAR DINERO (+)
+    else {
+        btn.className = "btn btn-success fw-bold";
+        btn.innerHTML = '<i class="fas fa-plus"></i> Sumar';
+
+        // Opción 1: Ingreso Nuevo (dinero mágico/nómina)
+        let opt1 = document.createElement('option');
+        opt1.value = 'income';
+        opt1.text = `💰 Ingreso Nuevo / Sin Concepto`;
+        select.add(opt1);
+
+        // Opciones de Transferencia (De dónde vino)
+        if (type === 'debit') {
+            // Si entra a Banco, puede venir de Efectivo
+            appData.assets.forEach((a, i) => {
+                let opt = document.createElement('option');
+                opt.value = `asset_${i}`;
+                opt.text = `📤 Traer de: ${a.name}`;
+                select.add(opt);
+            });
+        } else if (type === 'asset') {
+            // Si entra a Efectivo, puede venir del Banco
+            appData.debit.forEach((d, i) => {
+                let opt = document.createElement('option');
+                opt.value = `debit_${i}`;
+                opt.text = `🏧 Retirar de: ${d.name}`;
+                select.add(opt);
+            });
+        }
+    }
+}
+
+function hideQuickInput() {
+    document.getElementById('quick-input-container').classList.add('d-none');
+}
+
+// 3. Ejecutar la operación real
+function applyQuickInput() {
+    const amount = parseFloat(document.getElementById('quick-amount-val').value);
+    const contextVal = document.getElementById('quick-context-select').value;
+    
+    // Datos del item actual (el que estamos editando)
+    const type = document.getElementById('edit-type').value;
+    const idx = parseInt(document.getElementById('edit-idx').value);
+    const currentName = document.getElementById('edit-name').value; // Usamos el nombre actual por si se editó
+    
+    if (!amount || amount <= 0) { showToast('Monto inválido', 'error'); return; }
+
+    // Referencia al objeto actual en memoria
+    let currentItem;
+    if (type === 'debit') currentItem = appData.debit[idx];
+    else if (type === 'asset') currentItem = appData.assets[idx];
+    else return; // No aplica para préstamos por ahora
+
+    // --- LÓGICA DE TRANSFERENCIA ---
+    
+    // 1. Modificar el item actual
+    if (currentQuickOp === '+') {
+        if(type === 'debit') currentItem.balance += amount;
+        else currentItem.amount += amount;
+    } else {
+        if(type === 'debit') currentItem.balance -= amount;
+        else currentItem.amount -= amount;
+    }
+
+    // 2. Modificar el "Otro lado" (si es transferencia)
+    let logMsg = '';
+    
+    if (contextVal === 'expense') {
+        logMsg = `Gasto/Retiro de ${currentName}`;
+    } 
+    else if (contextVal === 'income') {
+        logMsg = `Ingreso directo a ${currentName}`;
+    } 
+    else {
+        // Es una transferencia (ej. "asset_0" o "debit_2")
+        const [targetType, targetIdx] = contextVal.split('_');
+        const tIdx = parseInt(targetIdx);
+        
+        if (targetType === 'asset') {
+            const target = appData.assets[tIdx];
+            if (currentQuickOp === '-') { 
+                // Resté de aquí -> Movi a Asset
+                target.amount += amount; 
+                logMsg = `Movimiento: ${currentName} ➝ ${target.name}`;
+            } else { 
+                // Sumé aquí <- Traje de Asset
+                if(target.amount >= amount) {
+                    target.amount -= amount;
+                    logMsg = `Movimiento: ${target.name} ➝ ${currentName}`;
+                } else {
+                    showToast(`Saldo insuficiente en ${target.name}`, 'error');
+                    // Revertimos el cambio local porque falló la transferencia
+                    if(type === 'debit') currentItem.balance -= amount; else currentItem.amount -= amount;
+                    return;
+                }
+            }
+        } 
+        else if (targetType === 'debit') {
+            const target = appData.debit[tIdx];
+            if (currentQuickOp === '-') {
+                // Resté de aquí -> Movi a Debit
+                target.balance += amount;
+                logMsg = `Movimiento: ${currentName} ➝ ${target.name}`;
+            } else {
+                // Sumé aquí <- Traje de Debit
+                if(target.balance >= amount) {
+                    target.balance -= amount;
+                    logMsg = `Movimiento: ${target.name} ➝ ${currentName}`;
+                } else {
+                    showToast(`Saldo insuficiente en ${target.name}`, 'error');
+                    if(type === 'debit') currentItem.balance -= amount; else currentItem.amount -= amount;
+                    return;
+                }
+            }
+        }
+    }
+
+    // 3. Guardar, Log y UI
+    addLog(currentQuickOp === '+' ? 'deposito' : 'pago', logMsg, amount);
+    saveData();
+    updateUI();
+
+    // 4. Actualizar visualmente el modal abierto para reflejar el nuevo saldo
+    const newVal = (type === 'debit') ? currentItem.balance : currentItem.amount;
+    document.getElementById('edit-amount').value = newVal.toFixed(2);
+
+    hideQuickInput();
+    showToast(`✅ ${logMsg} (${fmt(amount)})`);
+}
+
+// (Asegúrate de que la función openEditModal que te pasé antes siga ahí, 
+// solo actualizamos la parte visual del HTML, la lógica de openEditModal sigue igual)
+
+// NUEVA FUNCIÓN: Eliminar directamente desde el modal de edición
+function deleteFromEdit() {
+    const type = document.getElementById('edit-type').value;
+    const idx = document.getElementById('edit-idx').value;
+    
+    // Cerrar modal actual
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    
+    // Llamar a la función de borrado existente (que tiene su propia confirmación)
+    delItem(type, idx); 
+}
+
+function saveEdit() {
+    const type = document.getElementById('edit-type').value;
+    const idx = document.getElementById('edit-idx').value;
+    const name = document.getElementById('edit-name').value;
+    const amt = parseFloat(document.getElementById('edit-amount').value);
+
+    if (name && amt >= 0) {
+        let oldAmt = 0; 
+
+        if (type === 'loan') {
+            appData.loans[idx].name = name;
+            appData.loans[idx].original = amt;
+        } 
+        else if (type === 'debit') {
+            oldAmt = appData.debit[idx].balance;
+            appData.debit[idx].name = name;
+            appData.debit[idx].balance = amt;
+            
+            // Log si hubo cambio
+            if (Math.abs(oldAmt - amt) > 0.1) {
+                const diff = amt - oldAmt;
+                addLog('ajuste', `Ajuste manual en ${name}`, Math.abs(diff));
+            }
+        } 
+        else if (type === 'asset') {
+            oldAmt = appData.assets[idx].amount;
+            appData.assets[idx].name = name;
+            appData.assets[idx].amount = amt;
+            
+            if (Math.abs(oldAmt - amt) > 0.1) {
+                const diff = amt - oldAmt;
+                addLog('ajuste', `Ajuste manual en ${name}`, Math.abs(diff));
+            }
+        }
+        
+        saveData();
+        updateUI();
+        bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+        showToast('✅ Cambios guardados');
+    } else {
+        alert("Datos inválidos");
+    }
+}
+
 function delItem(type, idx) { document.getElementById('del-type').value = type; document.getElementById('del-idx').value = idx; new bootstrap.Modal(document.getElementById('deleteModal')).show(); }
 function confirmDelete() { const type = document.getElementById('del-type').value; const idx = parseInt(document.getElementById('del-idx').value); if (type === 'loan') appData.loans.splice(idx, 1); else if (type === 'debit') appData.debit.splice(idx, 1); else if (type === 'asset') appData.assets.splice(idx, 1); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('deleteModal')).hide(); }
 
@@ -399,8 +671,6 @@ function renderCardDetail(i) {
         c.transactions.forEach((x, ix) => {
             let pd = (x.amount / (x.months || 1)) * (x.paidCycles || 0);
             let r = x.amount - pd; if (r < 0) r = 0;
-
-            // Icono basado en categoría (o General si viene de Excel)
             let catIcon = getCategoryIcon(x.category || 'General');
 
             t.innerHTML += `
@@ -424,29 +694,19 @@ function renderCardDetail(i) {
         });
     }
 }
-function updateChart() {
-    const c = document.getElementById('mainChart').getContext('2d'); if (myChart) myChart.destroy();
-    const bg = appData.cards.map(c => getBankColorHex(c.name));
-    myChart = new Chart(c, { type: 'bar', data: { labels: appData.cards.map(x => x.name), datasets: [{ label: 'Deuda', data: appData.cards.map(x => calcCard(x).debt), backgroundColor: bg, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } } } })
-}
 
 // --- V0.12: FUNCIONES DE SISTEMA (BACKUP & PRIVACIDAD) ---
 
-// 1. MODO PRIVACIDAD
 function togglePrivacy() {
     document.body.classList.toggle('privacy-active');
     const icon = document.getElementById('privacy-icon');
-
     if (document.body.classList.contains('privacy-active')) {
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
+        icon.classList.remove('fa-eye'); icon.classList.add('fa-eye-slash');
     } else {
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
+        icon.classList.remove('fa-eye-slash'); icon.classList.add('fa-eye');
     }
 }
 
-// 2. DESCARGAR RESPALDO (EXPORTAR JSON)
 function downloadBackup() {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
     const dlAnchorElem = document.createElement('a');
@@ -459,7 +719,6 @@ function downloadBackup() {
 }
 
 function openRestoreModal() {
-    // Limpiamos el input por si había un archivo seleccionado antes
     document.getElementById('backup-file-input').value = '';
     new bootstrap.Modal(document.getElementById('restoreBackupModal')).show();
 }
@@ -467,130 +726,34 @@ function openRestoreModal() {
 function processRestoreFile() {
     const input = document.getElementById('backup-file-input');
     const file = input.files[0];
-
-    if (!file) {
-        alert("Por favor selecciona un archivo .json primero.");
-        return;
-    }
+    if (!file) { showToast('Selecciona un archivo JSON', 'error'); return; }
 
     const reader = new FileReader();
-    
     reader.onload = function(e) {
         try {
-            // A. Convertir texto a Objeto JSON
             const json = JSON.parse(e.target.result);
-            
-            // B. Validación básica (¿Es un archivo de esta app?)
-            // Verificamos si tiene las propiedades clave
-            if (json.cards && json.loans && json.debit) {
-                
-                // C. Actualizar Memoria
+            if (json.cards && json.loans) {
                 appData = json;
-                
-                // D. Guardar en LocalStorage (Persistencia)
                 saveData();
-                
-                // E. Refrescar la Interfaz (Visual)
                 updateUI();
-                
-                // F. Cerrar Modal y Avisar
                 bootstrap.Modal.getInstance(document.getElementById('restoreBackupModal')).hide();
-                
-                // --- CAMBIO AQUÍ ---
-                // Reemplazamos el alert feo por el Toast bonito
-                showToast('<i class="fas fa-check-circle me-2"></i>¡Copia de seguridad restaurada con éxito!');
-                
+                showToast('✅ Datos restaurados correctamente');
             } else {
-                // También podemos usarlo para errores
-                showToast('<i class="fas fa-times-circle me-2"></i>El archivo no es válido.', 'error');
+                showToast('Archivo inválido', 'error');
             }
         } catch (error) {
             console.error(error);
-            alert("❌ Ocurrió un error al leer el archivo. Asegúrate de que sea un JSON válido.");
-        }
-    };
-
-    reader.readAsText(file);
-}
-
-// 3. RESTAURAR RESPALDO (IMPORTAR JSON)
-document.getElementById('backupInput').addEventListener('change', function (e) {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function (e) {
-        try {
-            const json = JSON.parse(e.target.result);
-
-            // Validación básica para asegurar que es un archivo válido de nuestra app
-            if (json.cards && json.loans && json.debit) {
-                if (confirm("⚠️ ¿Estás seguro? Esto reemplazará todos tus datos actuales con los del respaldo.")) {
-                    appData = json;
-                    saveData();
-                    updateUI();
-                    alert("✅ ¡Respaldo restaurado con éxito!");
-                }
-            } else {
-                alert("❌ El archivo no tiene el formato correcto.");
-            }
-        } catch (error) {
-            alert("❌ Error al leer el archivo JSON.");
-            console.error(error);
+            showToast('Error al leer el archivo', 'error');
         }
     };
     reader.readAsText(file);
-    // Limpiar el input para permitir cargar el mismo archivo si es necesario
-    e.target.value = '';
-});
-
-// --- LÓGICA DE BORRADO DE TRANSACCIONES ---
-
-// 1. Abrir el Modal al dar clic en el icono de basura
-function delTransaction(ix) {
-    const cardIdx = document.getElementById('card-selector').value;
-
-    // Verificamos que la tarjeta exista
-    if (appData.cards[cardIdx] && appData.cards[cardIdx].transactions[ix]) {
-        const transaction = appData.cards[cardIdx].transactions[ix];
-
-        // Llenamos el modal con datos
-        document.getElementById('del-trans-name').innerText = transaction.desc;
-        document.getElementById('del-trans-index').value = ix;
-
-        // Abrimos el modal
-        new bootstrap.Modal(document.getElementById('deleteTransModal')).show();
-    }
 }
 
-// 2. Ejecutar el borrado al confirmar en el modal
-function confirmDeleteTransaction() {
-    const cardIdx = document.getElementById('card-selector').value;
-    const transIdx = document.getElementById('del-trans-index').value;
-
-    if (cardIdx !== "" && transIdx !== "") {
-        // Borrar del Array
-        appData.cards[cardIdx].transactions.splice(transIdx, 1);
-
-        saveData(); // Guardar
-
-        // Actualizar UI
-        updateUI();
-        renderCardDetail(cardIdx); // Refrescar la tabla visualmente
-
-        // Cerrar modal
-        const modalEl = document.getElementById('deleteTransModal');
-        const modal = bootstrap.Modal.getInstance(modalEl);
-        modal.hide();
-    }
-}
-
-// --- UTILIDAD: MOSTRAR NOTIFICACIÓN (TOAST) ---
+// --- TOAST ---
 function showToast(message, type = 'success') {
     const toastEl = document.getElementById('liveToast');
     const msgContainer = document.getElementById('toast-msg');
-    
-    // Cambiar color según tipo (éxito o error)
+
     if (type === 'error') {
         toastEl.classList.remove('bg-success');
         toastEl.classList.add('bg-danger');
@@ -599,28 +762,214 @@ function showToast(message, type = 'success') {
         toastEl.classList.add('bg-success');
     }
 
-    msgContainer.innerHTML = message; // Insertar mensaje
-    
-    const toast = new bootstrap.Toast(toastEl, { delay: 3000 }); // Dura 3 segundos
+    msgContainer.innerHTML = message;
+
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 });
     toast.show();
 }
 
 function openPurchaseModal() { const s = document.getElementById('card-selector'); const i = s.value; if (!appData.cards[i]) { alert("Carga Excel primero"); return } document.getElementById('purchase-card-name').innerText = appData.cards[i].name; document.getElementById('new-purch-desc').value = ''; document.getElementById('new-purch-amount').value = ''; document.getElementById('new-purch-months').value = '1'; new bootstrap.Modal(document.getElementById('addPurchaseModal')).show() }
 function savePurchase() {
     const i = document.getElementById('card-selector').value;
-    const cat = document.getElementById('new-purch-cat').value; // Nueva Categoría
+    const cat = document.getElementById('new-purch-cat').value;
     const d = document.getElementById('new-purch-desc').value;
     const a = parseFloat(document.getElementById('new-purch-amount').value);
     const m = parseInt(document.getElementById('new-purch-months').value);
 
     if (d && a > 0) {
         appData.cards[i].transactions.push({
-            desc: d, amount: a, months: m, paidCycles: 0, category: cat // Guardamos categoría
+            desc: d, amount: a, months: m, paidCycles: 0, category: cat
         });
         saveData(); updateUI();
         bootstrap.Modal.getInstance(document.getElementById('addPurchaseModal')).hide();
+        showToast('Compra registrada exitosamente');
     } else { alert("Completa datos"); }
 }
+
+// --- V0.13: PAGO TARJETA ---
+function openPayCardModal() {
+    const cardIdx = document.getElementById('card-selector').value;
+    if (!appData.cards[cardIdx]) { showToast('Selecciona una tarjeta', 'error'); return; }
+
+    document.getElementById('pay-card-target-name').innerText = appData.cards[cardIdx].name;
+    const sourceSelect = document.getElementById('pay-source-account');
+    sourceSelect.innerHTML = '';
+
+    appData.debit.forEach((acc, idx) => {
+        let opt = document.createElement('option');
+        opt.value = idx;
+        opt.text = `${acc.name} ($${fmt(acc.balance)})`;
+        opt.setAttribute('data-balance', acc.balance);
+        sourceSelect.add(opt);
+    });
+
+    document.getElementById('pay-card-amount').value = '';
+    document.getElementById('pay-remaining-balance').innerText = '---';
+    new bootstrap.Modal(document.getElementById('payCardModal')).show();
+}
+
+function fillFullDebt() {
+    const cardIdx = document.getElementById('card-selector').value;
+    const card = appData.cards[cardIdx];
+    const s = calcCard(card);
+    document.getElementById('pay-card-amount').value = s.debt.toFixed(2);
+    calcRemainingBalance();
+}
+
+function calcRemainingBalance() {
+    const select = document.getElementById('pay-source-account');
+    const amountIn = document.getElementById('pay-card-amount').value;
+    const display = document.getElementById('pay-remaining-balance');
+
+    if (select.selectedIndex === -1) return;
+
+    const currentBalance = parseFloat(select.options[select.selectedIndex].getAttribute('data-balance'));
+    const amountToPay = parseFloat(amountIn) || 0;
+    const remaining = currentBalance - amountToPay;
+
+    display.innerText = fmt(remaining);
+    if (remaining < 0) {
+        display.className = "fw-bold text-danger";
+        display.innerText = "Saldo Insuficiente";
+    } else {
+        display.className = "fw-bold text-success";
+    }
+}
+
+function processCardPayment() {
+    const cardIdx = document.getElementById('card-selector').value;
+    const debitIdx = document.getElementById('pay-source-account').value;
+    const amount = parseFloat(document.getElementById('pay-card-amount').value);
+
+    if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+    const debitAcc = appData.debit[debitIdx];
+    if (debitAcc.balance < amount) { showToast(`Fondos insuficientes en ${debitAcc.name}`, 'error'); return; }
+
+    // Cerrar modal de datos
+    bootstrap.Modal.getInstance(document.getElementById('payCardModal')).hide();
+
+    // Confirmación
+    const msg = `Vas a pagar <strong>${fmt(amount)}</strong><br>a ${appData.cards[cardIdx].name} desde ${debitAcc.name}`;
+    askConfirmation(msg, () => {
+        debitAcc.balance -= amount;
+        if (!appData.cards[cardIdx].creditBalance) appData.cards[cardIdx].creditBalance = 0;
+        appData.cards[cardIdx].creditBalance += amount;
+
+        // LOG V0.15
+        addLog('pago', `Pago a tarjeta ${appData.cards[cardIdx].name}`, amount);
+
+        saveData(); updateUI(); renderCardDetail(cardIdx);
+        showToast(`✅ Pago aplicado correctamente`);
+    });
+}
+
+// --- LÓGICA DE DEPÓSITO ESPECÍFICA (CORREGIDA) ---
+
+
+// 2. Función que abre el modal de datos
+function openDepositModal() {
+    if (appData.assets.length === 0) { showToast('No tienes efectivo registrado', 'error'); return; }
+    if (appData.debit.length === 0) { showToast('Registra una cuenta primero', 'error'); return; }
+
+    const srcSelect = document.getElementById('dep-source-asset');
+    const targetSelect = document.getElementById('dep-target-account');
+    srcSelect.innerHTML = ''; targetSelect.innerHTML = '';
+
+    appData.assets.forEach((a, i) => {
+        let opt = document.createElement('option');
+        opt.value = i; opt.text = `${a.name} (Disp: ${fmt(a.amount)})`; srcSelect.add(opt);
+    });
+    appData.debit.forEach((d, i) => {
+        let opt = document.createElement('option');
+        opt.value = i; opt.text = d.name; targetSelect.add(opt);
+    });
+
+    document.getElementById('dep-amount').value = '';
+    new bootstrap.Modal(document.getElementById('depositModal')).show();
+}
+
+// 3. Función que VALIDA y abre la ventana de CONFIRMACIÓN
+function processDeposit() {
+    const assetIdx = document.getElementById('dep-source-asset').value;
+    const debitIdx = document.getElementById('dep-target-account').value;
+    const amount = parseFloat(document.getElementById('dep-amount').value);
+
+    // Validaciones
+    if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
+
+    const asset = appData.assets[assetIdx];
+    const account = appData.debit[debitIdx];
+
+    if (asset.amount < amount) { showToast(`No tienes suficientes fondos en ${asset.name}`, 'error'); return; }
+
+    // A. Guardamos los datos para usarlos después
+    depositoPendiente = {
+        assetIndex: assetIdx,
+        debitIndex: debitIdx,
+        monto: amount
+    };
+
+    // B. Cerramos el modal de llenado de datos
+    bootstrap.Modal.getInstance(document.getElementById('depositModal')).hide();
+
+    // C. Preparamos el texto del modal de confirmación ESPECÍFICO
+    document.getElementById('texto-confirmar-deposito').innerHTML =
+        `¿Depositar <span class="text-dark">${fmt(amount)}</span><br>de ${asset.name} a ${account.name}?`;
+
+    // D. Abrimos la ventana emergente específica
+    new bootstrap.Modal(document.getElementById('modalConfirmarDeposito')).show();
+}
+
+// 4. Función que EJECUTA el movimiento REAL (Al dar clic en "Sí, Depositar")
+function ejecutarDepositoReal() {
+    if (depositoPendiente) {
+        const asset = appData.assets[depositoPendiente.assetIndex];
+        const account = appData.debit[depositoPendiente.debitIndex];
+        const amount = depositoPendiente.monto;
+
+        // 1. Restar y Sumar
+        asset.amount -= amount;
+        account.balance += amount;
+
+        // 2. LOG (Historial v0.15)
+        // Nota: Asegúrate de tener la función addLog en tu código
+        if (typeof addLog === 'function') {
+            addLog('deposito', `Depósito de ${asset.name} a ${account.name}`, amount);
+        }
+
+        // 3. Guardar y Actualizar (CRÍTICO)
+        saveData();
+        updateUI();
+
+        // 4. Cerrar el modal y limpiar
+        bootstrap.Modal.getInstance(document.getElementById('modalConfirmarDeposito')).hide();
+        depositoPendiente = null;
+
+        showToast(`✅ Depósito registrado con éxito`);
+    }
+}
+// --- BORRADO ---
+function delTransaction(ix) {
+    const cardIdx = document.getElementById('card-selector').value;
+    if (appData.cards[cardIdx] && appData.cards[cardIdx].transactions[ix]) {
+        const transaction = appData.cards[cardIdx].transactions[ix];
+        document.getElementById('del-trans-name').innerText = transaction.desc;
+        document.getElementById('del-trans-index').value = ix;
+        new bootstrap.Modal(document.getElementById('deleteTransModal')).show();
+    }
+}
+
+function confirmDeleteTransaction() {
+    const cardIdx = document.getElementById('card-selector').value;
+    const transIdx = document.getElementById('del-trans-index').value;
+    if (cardIdx !== "" && transIdx !== "") {
+        appData.cards[cardIdx].transactions.splice(transIdx, 1);
+        saveData(); updateUI(); renderCardDetail(cardIdx);
+        bootstrap.Modal.getInstance(document.getElementById('deleteTransModal')).hide();
+        showToast('Movimiento eliminado');
+    }
+}
+
 function addNewLoan() { const n = document.getElementById('nl-name').value; const a = parseFloat(document.getElementById('nl-amount').value); if (n && a) { appData.loans.push({ name: n, original: a, paid: 0 }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addLoanModal')).hide(); document.getElementById('nl-name').value = ''; document.getElementById('nl-amount').value = '' } }
 function openPayModal(i, n) { document.getElementById('pay-label').innerText = `Abonar a: ${n}`; document.getElementById('pay-idx').value = i; document.getElementById('pay-amount').value = ''; new bootstrap.Modal(document.getElementById('payModal')).show() }
 function submitPay() { const i = document.getElementById('pay-idx').value; const a = parseFloat(document.getElementById('pay-amount').value); if (a > 0) { appData.loans[i].paid += a; saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('payModal')).hide() } }
