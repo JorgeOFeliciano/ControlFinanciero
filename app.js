@@ -15,6 +15,19 @@ const defaultData = {
     history: [] // NUEVO V0.15: Historial de movimientos
 };
 
+// --- DEFINICIÓN DE GRADIENTES (V0.17.1) ---
+const cardGradients = {
+    'blue': 'linear-gradient(135deg, #00b4db, #0083b0)',
+    'purple': 'linear-gradient(135deg, #82269e, #a450c0)',
+    'dark': 'linear-gradient(135deg, #232526, #414345)',
+    'teal': 'linear-gradient(135deg, #11998e, #38ef7d)',
+    'green': 'linear-gradient(135deg, #0f9b0f, #005c00)',
+    'orange': 'linear-gradient(135deg, #f12711, #f5af19)',
+    'red': 'linear-gradient(135deg, #cb2d3e, #ef473a)',
+    'pink': 'linear-gradient(135deg, #ec008c, #fc6767)',
+    'gold': 'linear-gradient(135deg, #f7971e, #ffd200)'
+};
+
 let appData = JSON.parse(JSON.stringify(defaultData));
 let myChart = null;
 let calendarViewDate = new Date();
@@ -275,16 +288,57 @@ function updateUI() {
         lb.innerHTML += `<tr><td><div class="d-flex align-items-center"><i class="fas fa-grip-vertical drag-handle me-2"></i><div class="w-100"><div class="fw-bold">${l.name}</div><div class="small text-muted" style="font-size:0.75rem">Orig: ${fmt(l.original)} | Pagado: ${fmt(l.paid)}</div><div class="progress mt-1" style="height: 4px; width: 100%; max-width: 120px; border-radius: 2px;"><div class="progress-bar bg-success" role="progressbar" style="width: ${percent}%"></div></div></div></div></td><td class="text-end fw-bold text-danger">${fmt(rem)}</td><td class="text-end"><button class="btn-icon btn-light text-warning me-1" onclick="openEditModal('loan',${i})"><i class="fas fa-pen" style="font-size:0.8rem"></i></button>${rem > 0 ? `<button class="btn-icon btn-icon-pay me-1" onclick="openPayModal(${i},'${l.name}')"><i class="fas fa-dollar-sign"></i></button>` : '<span class="badge bg-success me-1">Pagado</span>'}<button class="btn-icon btn-icon-del" onclick="delItem('loan',${i})"><i class="fas fa-trash"></i></button></td></tr>`;
     });
 
-    // Débito
-    let tDebit = 0; const dGrid = document.getElementById('debit-grid'); dGrid.innerHTML = '';
-    if (!appData.debit) appData.debit = defaultData.debit;
+    // DÉBITO (Actualizado V0.17)
+    
+    // DÉBITO (V0.17.1 - Híbrido: Personalizado + Legacy)
+    let tDebit = 0; 
+    const dGrid = document.getElementById('debit-grid'); 
+    dGrid.innerHTML = '';
+    
     appData.debit.forEach((d, i) => {
         tDebit += d.balance;
-        const colorClass = getBankClass(d.name);
-        dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card ${colorClass}" onclick="openEditModal('debit', ${i})" title="Clic para editar saldo"><i class="fas fa-wifi card-contactless"></i><div class="card-chip-icon"></div><div class="mini-card-name mt-2">${d.name}</div><div class="mt-auto text-end"><div class="small opacity-75">Saldo</div><div class="mini-card-balance">${fmt(d.balance)}</div></div></div></div>`;
-    });
-    dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card mini-card-add h-100" onclick="openDebitModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
+        
+        // 1. Determinar icono de red (si existe)
+        let netIconClass = 'fa-wifi opacity-50'; // Icono por defecto si es vieja
+        if (d.network === 'visa') netIconClass = 'fab fa-cc-visa fa-lg';
+        else if (d.network === 'mastercard') netIconClass = 'fab fa-cc-mastercard fa-lg';
+        else if (d.network === 'amex') netIconClass = 'fab fa-cc-amex fa-lg';
 
+        // 2. Determinar Estilo (LA CLAVE DEL ARREGLO)
+        let cardStyle = '';
+        let cardClasses = 'mini-card text-white'; // Clases base
+
+        // ¿Tiene color personalizado guardado?
+        if (d.color && cardGradients[d.color]) {
+            // SÍ: Usar estilo en línea con el gradiente nuevo
+            cardStyle = `background: ${cardGradients[d.color]}; box-shadow: 0 4px 15px rgba(0,0,0,0.15);`;
+        } else {
+            // NO (es una tarjeta vieja): Usar el sistema antiguo de clases CSS (getBankClass)
+            // Asegúrate de que la función getBankClass siga existiendo en tu código
+            cardClasses += ` ${getBankClass(d.name)}`;
+        }
+
+        dGrid.innerHTML += `
+        <div class="col-6 col-md-4">
+            <div class="${cardClasses}" 
+                 onclick="openEditModal('debit', ${i})" 
+                 style="${cardStyle}">
+                
+                <div class="d-flex justify-content-between mb-3">
+                     ${d.network ? `<i class="${netIconClass}"></i>` : '<i class="fas fa-wifi opacity-50"></i><div class="card-chip-icon"></div>'}
+                </div>
+                
+                <div class="mini-card-name fw-bold" style="letter-spacing:0.5px;">${d.name}</div>
+                
+                <div class="mt-auto text-end">
+                    <div class="small opacity-75" style="font-size: 0.7rem;">Saldo</div>
+                    <div class="mini-card-balance fw-bold">${fmt(d.balance)}</div>
+                </div>
+            </div>
+        </div>`;
+    });
+    // Botón agregar
+    dGrid.innerHTML += `<div class="col-6 col-md-4"><div class="mini-card mini-card-add h-100" onclick="openDebitModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
     // Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
     if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><button class="btn-icon btn-icon-del" style="cursor: not-allowed; opacity: 0.5;"><i class="fas fa-lock"></i></button></td></tr>`;
@@ -319,20 +373,77 @@ function updateChart() {
 }
 
 // --- MODALES (Genéricos) ---
-function openDebitModal() { document.getElementById('new-debit-name').value = ''; document.getElementById('new-debit-balance').value = ''; new bootstrap.Modal(document.getElementById('addDebitModal')).show(); }
-function saveNewDebit() { const name = document.getElementById('new-debit-name').value; const balance = parseFloat(document.getElementById('new-debit-balance').value); if (name && balance >= 0) { appData.debit.push({ name: name, balance: balance }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addDebitModal')).hide(); } else { alert("Datos inválidos"); } }
+function openDebitModal() { 
+    document.getElementById('new-debit-name').value = ''; 
+    document.getElementById('new-debit-balance').value = ''; 
+    document.getElementById('new-debit-network').value = 'visa';
+    // Aseguramos que el primero esté seleccionado
+    document.getElementById('c_blue').checked = true; 
+    
+    updateCardPreview(); 
+    new bootstrap.Modal(document.getElementById('addDebitModal')).show(); 
+}
+
+function saveNewDebit() { 
+    const name = document.getElementById('new-debit-name').value; 
+    const balance = parseFloat(document.getElementById('new-debit-balance').value); 
+    const network = document.getElementById('new-debit-network').value;
+    const colorRadio = document.querySelector('input[name="card-color"]:checked');
+    const color = colorRadio ? colorRadio.value : 'blue';
+
+    if(name && balance >= 0) { 
+        // Guardamos todo el objeto con color y red
+        appData.debit.push({
+            name: name, 
+            balance: balance,
+            network: network, // Guardamos 'visa', 'mastercard', etc.
+            color: color      // Guardamos 'blue', 'purple', etc.
+        }); 
+        saveData(); 
+        updateUI(); 
+        bootstrap.Modal.getInstance(document.getElementById('addDebitModal')).hide(); 
+        showToast('Tarjeta creada con éxito');
+    } else { 
+        alert("Datos inválidos"); 
+    } 
+}
+
+// --- VISTA PREVIA DE TARJETA ---
+// --- VISTA PREVIA DE TARJETA (Actualizada) ---
+function updateCardPreview() {
+    const name = document.getElementById('new-debit-name').value || 'NOMBRE BANCO';
+    const balance = parseFloat(document.getElementById('new-debit-balance').value) || 0;
+    const network = document.getElementById('new-debit-network').value;
+    
+    const colorRadio = document.querySelector('input[name="card-color"]:checked');
+    const colorVal = colorRadio ? colorRadio.value : 'blue';
+
+    document.getElementById('preview-name').innerText = name.toUpperCase();
+    document.getElementById('preview-balance').innerText = fmt(balance);
+
+    const iconEl = document.getElementById('preview-network-icon');
+    iconEl.className = ''; 
+    if (network === 'visa') iconEl.className = 'fab fa-cc-visa fa-2x';
+    else if (network === 'mastercard') iconEl.className = 'fab fa-cc-mastercard fa-2x';
+    else if (network === 'amex') iconEl.className = 'fab fa-cc-amex fa-2x';
+
+    // Usamos la variable global
+    document.getElementById('new-card-preview').style.background = cardGradients[colorVal];
+}
+
 function openAssetModal(forcedType) { const sel = document.getElementById('asset-type-select'); document.getElementById('asset-custom-name').value = ''; document.getElementById('asset-amount').value = ''; sel.value = 'Billetes'; toggleCustomAssetInput(); new bootstrap.Modal(document.getElementById('addAssetModal')).show(); }
 function toggleCustomAssetInput() { const type = document.getElementById('asset-type-select').value; const input = document.getElementById('asset-custom-name'); if (type === 'Otro') { input.classList.remove('d-none'); input.focus(); } else { input.classList.add('d-none'); } }
 function saveNewAsset() { const type = document.getElementById('asset-type-select').value; let name = type; if (type === 'Otro') { name = document.getElementById('asset-custom-name').value.trim(); if (!name) return; } const amount = parseFloat(document.getElementById('asset-amount').value); if (amount > 0) { const idx = appData.assets.findIndex(a => a.name === name); if (idx >= 0) appData.assets[idx].amount += amount; else appData.assets.push({ name: name, amount: amount }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addAssetModal')).hide(); } }
 // --- GESTIÓN DEL MODAL DE EDICIÓN (V0.16) ---
 
+// --- GESTIÓN DEL MODAL DE EDICIÓN (V0.16 CON BLOQUEO) ---
+
 function openEditModal(type, idx) {
-    // 1. Obtener referencias a los elementos del NUEVO HTML
+    // 1. Obtener referencias
     const header = document.getElementById('edit-modal-header');
     const nameIn = document.getElementById('edit-name');
-    const amtIn = document.getElementById('edit-amount');
+    const amtIn = document.getElementById('edit-amount'); // Referencia al input del saldo
     
-    // Estos son los IDs clave de la versión Inline
     const actionsBlock = document.getElementById('quick-actions-block'); 
     const inputContainer = document.getElementById('quick-input-container');
 
@@ -343,7 +454,7 @@ function openEditModal(type, idx) {
     let item;
     let colorClass = 'bg-secondary'; 
 
-    // 3. Resetear visualización (Ocultar la cajita de suma/resta por defecto)
+    // 3. Resetear visualización
     if(inputContainer) {
         inputContainer.classList.add('d-none'); 
         document.getElementById('quick-amount-val').value = ''; 
@@ -353,34 +464,47 @@ function openEditModal(type, idx) {
     if (type === 'loan') {
         item = appData.loans[idx];
         colorClass = 'bg-danger'; 
-        if(actionsBlock) actionsBlock.classList.add('d-none'); // No mostrar acciones rápidas en préstamos
+        if(actionsBlock) actionsBlock.classList.add('d-none');
+        
         nameIn.value = item.name;
-        amtIn.value = item.original; 
+        amtIn.value = item.original;
+        
+        // LOS PRÉSTAMOS SÍ SE EDITAN MANUALMENTE (No tienen botones rápidos aún)
+        amtIn.readOnly = false; 
+        amtIn.classList.remove('bg-light'); // Que se vea blanco (editable)
     } 
     else if (type === 'debit') {
         item = appData.debit[idx];
         colorClass = 'bg-primary'; 
-        if(actionsBlock) actionsBlock.classList.remove('d-none'); // Mostrar acciones
+        if(actionsBlock) actionsBlock.classList.remove('d-none');
+        
         nameIn.value = item.name;
         amtIn.value = item.balance;
+        
+        // --- AQUÍ ESTÁ EL CAMBIO ---
+        // BLOQUEAMOS EL CAMPO PARA OBLIGAR A USAR LOS BOTONES
+        amtIn.readOnly = true; 
+        amtIn.classList.add('bg-light'); // Se ve grisaseo para indicar bloqueo
     } 
     else if (type === 'asset') {
         item = appData.assets[idx];
         colorClass = 'bg-success'; 
-        if(actionsBlock) actionsBlock.classList.remove('d-none'); // Mostrar acciones
+        if(actionsBlock) actionsBlock.classList.remove('d-none');
+        
         nameIn.value = item.name;
         amtIn.value = item.amount;
+        
+        // BLOQUEAMOS EL CAMPO TAMBIÉN EN ACTIVOS
+        amtIn.readOnly = true;
+        amtIn.classList.add('bg-light');
     }
 
     // 5. Aplicar estilos y abrir
-    // Nota: Importante mantener el estilo base del header y solo cambiar el color de fondo
     header.className = `modal-header border-bottom-0 text-white ${colorClass}`;
-    // Si usaste el style="background: #333" en el HTML, esta clase lo sobrescribirá correctamente gracias a CSS de Bootstrap
-    header.style.background = ''; // Limpiamos el estilo inline manual para que la clase CSS mande
+    header.style.background = ''; 
     
     new bootstrap.Modal(document.getElementById('editModal')).show();
 }
-
 // --- LÓGICA DE AJUSTE EN LÍNEA (V0.16 INLINE) ---
 
 // --- LÓGICA DE TRANSFERENCIAS RÁPIDAS (V0.16) ---

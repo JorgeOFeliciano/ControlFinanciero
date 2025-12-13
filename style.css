@@ -464,6 +464,14 @@ body.privacy-active #total-income-display {
     transform: translateY(-1px);
 }
 
+/* Estilo para selección de color */
+/* Estilo mejorado para selección de color en el modal */
+.btn-check:checked + label {
+    box-shadow: 0 0 0 2px white, 0 0 0 4px #333 !important; /* Doble borde para contraste */
+    transform: scale(1.05);
+}
+
+
 /* COLORES DE BANCOS */
 .bg-nu { background: linear-gradient(135deg, #82269e 0%, #a450c0 100%); }
 .bg-bbva { background: linear-gradient(135deg, #004481 0%, #2dcccd 100%); }
