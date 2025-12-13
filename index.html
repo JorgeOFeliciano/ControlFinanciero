@@ -11,15 +11,34 @@
 <body>
 
     <div class="header-bg">
-        <div class="container d-flex justify-content-between align-items-center">
-            <div>
-                <h3 class="fw-bold mb-0"><i class="fas fa-wallet me-2"></i>Control Financiero</h3>
-                <p class="opacity-75 mb-0 small">Deudas, Cobranza e Ingresos</p>
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                
+                <div>
+                    <h3 class="fw-bold mb-0"><i class="fas fa-wallet me-2"></i>Control Financiero</h3>
+                    <p class="opacity-75 mb-0 small">Deudas, Cobranza e Ingresos</p>
+                </div>
+
+                <div class="d-flex gap-2">
+                    
+                    <button class="btn btn-header btn-sm" onclick="togglePrivacy()" title="Ocultar/Mostrar Montos">
+                        <i class="fas fa-eye" id="privacy-icon"></i>
+                    </button>
+
+                    <button class="btn btn-header btn-sm" onclick="downloadBackup()" title="Guardar Respaldo (JSON)">
+                        <i class="fas fa-download"></i>
+                    </button>
+
+                    <button class="btn btn-header btn-sm" onclick="openRestoreModal()" title="Restaurar Respaldo">
+                        <i class="fas fa-upload"></i>
+                    </button>
+
+                    <label class="btn btn-light btn-sm text-primary fw-bold shadow-sm" title="Importar Excel Bancario">
+                        <i class="fas fa-file-excel me-2"></i>Excel
+                        <input type="file" id="excelInput" accept=".xlsx, .xls">
+                    </label>
+                </div>
             </div>
-            <label class="btn btn-light btn-sm text-primary fw-bold shadow-sm">
-                <i class="fas fa-file-excel me-2"></i>Cargar Excel
-                <input type="file" id="excelInput" accept=".xlsx, .xls">
-            </label>
         </div>
     </div>
 
@@ -522,6 +541,81 @@
                 <div class="modal-footer border-0 pt-0 pb-4 px-4">
                     <button type="button" class="btn btn-gradient w-100 rounded-pill py-2 fw-bold" onclick="savePurchase()"><i class="fas fa-check-circle me-2"></i>Confirmar Gasto</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteTransModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h6 class="modal-title fw-bold text-danger">Borrar Movimiento</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="mb-3">
+                        <i class="fas fa-trash-alt text-danger fa-3x"></i>
+                    </div>
+                    <p class="small text-muted mb-0">¿Eliminar esta compra de la tarjeta?</p>
+                    <p class="small fw-bold text-dark mt-1" id="del-trans-name">...</p>
+                    
+                    <input type="hidden" id="del-trans-index">
+                </div>
+                <div class="modal-footer border-top-0 pt-0">
+                    <div class="row w-100 g-2">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-light w-100 rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-danger w-100 rounded-pill" onclick="confirmDeleteTransaction()">Borrar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="restoreBackupModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 bg-warning bg-opacity-10">
+                    <h6 class="modal-title fw-bold text-dark">
+                        <i class="fas fa-history me-2 text-warning"></i>Restaurar Datos
+                    </h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-4">
+                        <i class="fas fa-file-import fa-3x text-muted mb-3"></i>
+                        <p class="text-muted small">
+                            Selecciona tu archivo <strong>.json</strong> de respaldo.
+                            <br>
+                            <span class="text-danger fw-bold">⚠️ Advertencia:</span> Esto reemplazará toda la información actual.
+                        </p>
+                    </div>
+
+                    <div class="input-group mb-3">
+                        <input type="file" class="form-control" id="backup-file-input" accept=".json">
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-top-0 pt-0 justify-content-center pb-4">
+                    <button type="button" class="btn btn-dark rounded-pill px-4" onclick="processRestoreFile()">
+                        <i class="fas fa-check-circle me-2"></i>Cargar y Actualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+        <div id="liveToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-bold" id="toast-msg">
+                    </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
             </div>
         </div>
     </div>

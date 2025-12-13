@@ -365,45 +365,45 @@ function dateClick(d, s, p, f) { if (f) { const m = ["🔮 ¡Aún no viajas en e
 function saveCalendarIncome() { const d = document.getElementById('cal-modal-date').value; const v = parseFloat(document.getElementById('cal-modal-amount').value); if (document.getElementById('cal-modal-amount').value === '') { appData.incomes = appData.incomes.filter(x => x.date !== d) } else if (v > 0) { appData.incomes = appData.incomes.filter(x => x.date !== d); appData.incomes.push({ date: d, amount: v }) } saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide() }
 function updateSelectors() { const s = document.getElementById('card-selector'); if (s.options.length !== appData.cards.length) { const v = s.value; s.innerHTML = ''; const cOpt = document.getElementById('custom-select-options'); cOpt.innerHTML = ''; appData.cards.forEach((c, i) => { let o = document.createElement('option'); o.value = i; o.text = c.name; s.add(o); let co = document.createElement('span'); co.className = 'custom-option'; if (i == (v || 0)) co.classList.add('selected'); let ic = '<i class="fas fa-credit-card me-2 opacity-50"></i>'; if (c.name.toLowerCase().includes('nu')) ic = '<i class="fas fa-cube me-2 text-primary"></i>'; if (c.name.toLowerCase().includes('mercado')) ic = '<i class="fas fa-handshake me-2 text-info"></i>'; if (c.name.toLowerCase().includes('bbva')) ic = '<i class="fas fa-university me-2 text-primary"></i>'; co.innerHTML = `${ic} ${c.name}`; co.addEventListener('click', function () { s.value = i; document.getElementById('custom-select-text').innerHTML = this.innerHTML; document.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected')); this.classList.add('selected'); document.getElementById('custom-card-select').classList.remove('open'); renderCardDetail(i) }); cOpt.appendChild(co) }); s.value = v || 0; if (appData.cards.length > 0) { const initIdx = v || 0; const ops = cOpt.querySelectorAll('.custom-option'); if (ops[initIdx]) { document.getElementById('custom-select-text').innerHTML = ops[initIdx].innerHTML; ops[initIdx].classList.add('selected') } renderCardDetail(s.value) } } }
 document.querySelector('.custom-select-trigger').addEventListener('click', function () { document.getElementById('custom-card-select').classList.toggle('open') }); window.addEventListener('click', function (e) { const s = document.getElementById('custom-card-select'); if (!s.contains(e.target)) s.classList.remove('open') });
-function renderCardDetail(i){
-    if(!appData.cards[i])return;
-    const c=appData.cards[i]; const s=calcCard(c);
-    const p=c.limit>0?(s.debt/c.limit)*100:0;
-    
-    document.getElementById('card-name').innerText=c.name;
-    document.getElementById('card-limit').innerText=`Lim: ${fmt(c.limit)}`;
-    document.getElementById('credit-balance-alert').classList.toggle('d-none',!(c.creditBalance>0));
-    document.getElementById('credit-balance-amount').innerText=fmt(c.creditBalance);
-    document.getElementById('card-used').innerText=fmt(s.debt);
-    document.getElementById('card-avail').innerText=fmt(s.avail);
-    
-    const cm = document.getElementById('card-monthly'); if(cm) cm.innerText=fmt(s.monthly);
-    document.getElementById('card-percent-text').innerText=`${p.toFixed(1)}%`;
-    document.getElementById('card-progress').style.width=`${p}%`;
-    const h=document.getElementById('card-visual-bg');
-    const n=c.name.toLowerCase();
-    
-    let bg='linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)';
-    if(n.includes('nu'))bg='linear-gradient(135deg, #82269e 0%, #a450c0 100%)';
-    else if(n.includes('bbva'))bg='linear-gradient(135deg, #004481 0%, #2dcccd 100%)';
-    else if(n.includes('santander'))bg='linear-gradient(135deg, #ec0000 0%, #ff4b4b 100%)';
-    else if(n.includes('mercado'))bg='linear-gradient(135deg, #009ee3 0%, #00c6fb 100%)';
-    else if(n.includes('stori'))bg='linear-gradient(135deg, #00a5a3 0%, #35dcb4 100%)';
-    else if(n.includes('didi'))bg='linear-gradient(135deg, #ff7e00 0%, #ffac4d 100%)';
-    h.style.background=bg;
-    
-    const t=document.getElementById('transactions-body'); t.innerHTML='';
-    if(c.transactions.length===0){
-        t.innerHTML=`<tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos</td></tr>`;
-    }else{
-        c.transactions.forEach((x,ix)=>{
-            let pd=(x.amount/(x.months||1))*(x.paidCycles||0);
-            let r=x.amount-pd; if(r<0)r=0;
-            
+function renderCardDetail(i) {
+    if (!appData.cards[i]) return;
+    const c = appData.cards[i]; const s = calcCard(c);
+    const p = c.limit > 0 ? (s.debt / c.limit) * 100 : 0;
+
+    document.getElementById('card-name').innerText = c.name;
+    document.getElementById('card-limit').innerText = `Lim: ${fmt(c.limit)}`;
+    document.getElementById('credit-balance-alert').classList.toggle('d-none', !(c.creditBalance > 0));
+    document.getElementById('credit-balance-amount').innerText = fmt(c.creditBalance);
+    document.getElementById('card-used').innerText = fmt(s.debt);
+    document.getElementById('card-avail').innerText = fmt(s.avail);
+
+    const cm = document.getElementById('card-monthly'); if (cm) cm.innerText = fmt(s.monthly);
+    document.getElementById('card-percent-text').innerText = `${p.toFixed(1)}%`;
+    document.getElementById('card-progress').style.width = `${p}%`;
+    const h = document.getElementById('card-visual-bg');
+    const n = c.name.toLowerCase();
+
+    let bg = 'linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)';
+    if (n.includes('nu')) bg = 'linear-gradient(135deg, #82269e 0%, #a450c0 100%)';
+    else if (n.includes('bbva')) bg = 'linear-gradient(135deg, #004481 0%, #2dcccd 100%)';
+    else if (n.includes('santander')) bg = 'linear-gradient(135deg, #ec0000 0%, #ff4b4b 100%)';
+    else if (n.includes('mercado')) bg = 'linear-gradient(135deg, #009ee3 0%, #00c6fb 100%)';
+    else if (n.includes('stori')) bg = 'linear-gradient(135deg, #00a5a3 0%, #35dcb4 100%)';
+    else if (n.includes('didi')) bg = 'linear-gradient(135deg, #ff7e00 0%, #ffac4d 100%)';
+    h.style.background = bg;
+
+    const t = document.getElementById('transactions-body'); t.innerHTML = '';
+    if (c.transactions.length === 0) {
+        t.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos</td></tr>`;
+    } else {
+        c.transactions.forEach((x, ix) => {
+            let pd = (x.amount / (x.months || 1)) * (x.paidCycles || 0);
+            let r = x.amount - pd; if (r < 0) r = 0;
+
             // Icono basado en categoría (o General si viene de Excel)
-            let catIcon = getCategoryIcon(x.category || 'General'); 
-            
-            t.innerHTML+=`
+            let catIcon = getCategoryIcon(x.category || 'General');
+
+            t.innerHTML += `
             <tr>
                 <td>
                     <div class="d-flex align-items-center">
@@ -429,6 +429,182 @@ function updateChart() {
     const bg = appData.cards.map(c => getBankColorHex(c.name));
     myChart = new Chart(c, { type: 'bar', data: { labels: appData.cards.map(x => x.name), datasets: [{ label: 'Deuda', data: appData.cards.map(x => calcCard(x).debt), backgroundColor: bg, borderRadius: 6 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } } } } })
 }
+
+// --- V0.12: FUNCIONES DE SISTEMA (BACKUP & PRIVACIDAD) ---
+
+// 1. MODO PRIVACIDAD
+function togglePrivacy() {
+    document.body.classList.toggle('privacy-active');
+    const icon = document.getElementById('privacy-icon');
+
+    if (document.body.classList.contains('privacy-active')) {
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+    } else {
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+    }
+}
+
+// 2. DESCARGAR RESPALDO (EXPORTAR JSON)
+function downloadBackup() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData));
+    const dlAnchorElem = document.createElement('a');
+    const date = new Date().toISOString().slice(0,10);
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `finanzas_respaldo_${date}.json`);
+    document.body.appendChild(dlAnchorElem);
+    dlAnchorElem.click();
+    dlAnchorElem.remove();
+}
+
+function openRestoreModal() {
+    // Limpiamos el input por si había un archivo seleccionado antes
+    document.getElementById('backup-file-input').value = '';
+    new bootstrap.Modal(document.getElementById('restoreBackupModal')).show();
+}
+
+function processRestoreFile() {
+    const input = document.getElementById('backup-file-input');
+    const file = input.files[0];
+
+    if (!file) {
+        alert("Por favor selecciona un archivo .json primero.");
+        return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+        try {
+            // A. Convertir texto a Objeto JSON
+            const json = JSON.parse(e.target.result);
+            
+            // B. Validación básica (¿Es un archivo de esta app?)
+            // Verificamos si tiene las propiedades clave
+            if (json.cards && json.loans && json.debit) {
+                
+                // C. Actualizar Memoria
+                appData = json;
+                
+                // D. Guardar en LocalStorage (Persistencia)
+                saveData();
+                
+                // E. Refrescar la Interfaz (Visual)
+                updateUI();
+                
+                // F. Cerrar Modal y Avisar
+                bootstrap.Modal.getInstance(document.getElementById('restoreBackupModal')).hide();
+                
+                // --- CAMBIO AQUÍ ---
+                // Reemplazamos el alert feo por el Toast bonito
+                showToast('<i class="fas fa-check-circle me-2"></i>¡Copia de seguridad restaurada con éxito!');
+                
+            } else {
+                // También podemos usarlo para errores
+                showToast('<i class="fas fa-times-circle me-2"></i>El archivo no es válido.', 'error');
+            }
+        } catch (error) {
+            console.error(error);
+            alert("❌ Ocurrió un error al leer el archivo. Asegúrate de que sea un JSON válido.");
+        }
+    };
+
+    reader.readAsText(file);
+}
+
+// 3. RESTAURAR RESPALDO (IMPORTAR JSON)
+document.getElementById('backupInput').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const json = JSON.parse(e.target.result);
+
+            // Validación básica para asegurar que es un archivo válido de nuestra app
+            if (json.cards && json.loans && json.debit) {
+                if (confirm("⚠️ ¿Estás seguro? Esto reemplazará todos tus datos actuales con los del respaldo.")) {
+                    appData = json;
+                    saveData();
+                    updateUI();
+                    alert("✅ ¡Respaldo restaurado con éxito!");
+                }
+            } else {
+                alert("❌ El archivo no tiene el formato correcto.");
+            }
+        } catch (error) {
+            alert("❌ Error al leer el archivo JSON.");
+            console.error(error);
+        }
+    };
+    reader.readAsText(file);
+    // Limpiar el input para permitir cargar el mismo archivo si es necesario
+    e.target.value = '';
+});
+
+// --- LÓGICA DE BORRADO DE TRANSACCIONES ---
+
+// 1. Abrir el Modal al dar clic en el icono de basura
+function delTransaction(ix) {
+    const cardIdx = document.getElementById('card-selector').value;
+
+    // Verificamos que la tarjeta exista
+    if (appData.cards[cardIdx] && appData.cards[cardIdx].transactions[ix]) {
+        const transaction = appData.cards[cardIdx].transactions[ix];
+
+        // Llenamos el modal con datos
+        document.getElementById('del-trans-name').innerText = transaction.desc;
+        document.getElementById('del-trans-index').value = ix;
+
+        // Abrimos el modal
+        new bootstrap.Modal(document.getElementById('deleteTransModal')).show();
+    }
+}
+
+// 2. Ejecutar el borrado al confirmar en el modal
+function confirmDeleteTransaction() {
+    const cardIdx = document.getElementById('card-selector').value;
+    const transIdx = document.getElementById('del-trans-index').value;
+
+    if (cardIdx !== "" && transIdx !== "") {
+        // Borrar del Array
+        appData.cards[cardIdx].transactions.splice(transIdx, 1);
+
+        saveData(); // Guardar
+
+        // Actualizar UI
+        updateUI();
+        renderCardDetail(cardIdx); // Refrescar la tabla visualmente
+
+        // Cerrar modal
+        const modalEl = document.getElementById('deleteTransModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+    }
+}
+
+// --- UTILIDAD: MOSTRAR NOTIFICACIÓN (TOAST) ---
+function showToast(message, type = 'success') {
+    const toastEl = document.getElementById('liveToast');
+    const msgContainer = document.getElementById('toast-msg');
+    
+    // Cambiar color según tipo (éxito o error)
+    if (type === 'error') {
+        toastEl.classList.remove('bg-success');
+        toastEl.classList.add('bg-danger');
+    } else {
+        toastEl.classList.remove('bg-danger');
+        toastEl.classList.add('bg-success');
+    }
+
+    msgContainer.innerHTML = message; // Insertar mensaje
+    
+    const toast = new bootstrap.Toast(toastEl, { delay: 3000 }); // Dura 3 segundos
+    toast.show();
+}
+
 function openPurchaseModal() { const s = document.getElementById('card-selector'); const i = s.value; if (!appData.cards[i]) { alert("Carga Excel primero"); return } document.getElementById('purchase-card-name').innerText = appData.cards[i].name; document.getElementById('new-purch-desc').value = ''; document.getElementById('new-purch-amount').value = ''; document.getElementById('new-purch-months').value = '1'; new bootstrap.Modal(document.getElementById('addPurchaseModal')).show() }
 function savePurchase() {
     const i = document.getElementById('card-selector').value;
@@ -445,7 +621,6 @@ function savePurchase() {
         bootstrap.Modal.getInstance(document.getElementById('addPurchaseModal')).hide();
     } else { alert("Completa datos"); }
 }
-function delTransaction(ix) { if (confirm("¿Borrar?")) { const c = document.getElementById('card-selector').value; appData.cards[c].transactions.splice(ix, 1); saveData(); updateUI() } }
 function addNewLoan() { const n = document.getElementById('nl-name').value; const a = parseFloat(document.getElementById('nl-amount').value); if (n && a) { appData.loans.push({ name: n, original: a, paid: 0 }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addLoanModal')).hide(); document.getElementById('nl-name').value = ''; document.getElementById('nl-amount').value = '' } }
 function openPayModal(i, n) { document.getElementById('pay-label').innerText = `Abonar a: ${n}`; document.getElementById('pay-idx').value = i; document.getElementById('pay-amount').value = ''; new bootstrap.Modal(document.getElementById('payModal')).show() }
 function submitPay() { const i = document.getElementById('pay-idx').value; const a = parseFloat(document.getElementById('pay-amount').value); if (a > 0) { appData.loans[i].paid += a; saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('payModal')).hide() } }
