@@ -641,6 +641,26 @@ body.privacy-active #total-income-display {
     .main-content { margin-left: 0; width: 100%; padding: 15px; }
 }
 
+/* --- style.css --- */
+
+/* Color verde brillante personalizado para que resalte en fondos de colores */
+.text-success-bright {
+    color: #2ecc71 !important; /* Un verde esmeralda más brillante */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3); /* Sombra suave para que "salte" del fondo */
+}
+
+/* Asegurar que los montos grandes sean blancos por defecto para mejor contraste */
+.credit-card-header .card-money-big {
+    color: #ffffff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+
+/* Rojo brillante para alertas de pago en tarjetas oscuras */
+.text-danger-bright {
+    color: #ff6b6b !important; /* Rojo coral neón */
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+}
+
 /* =========================================
    14. COLORES DE BANCOS (FALLBACK)
    ========================================= */

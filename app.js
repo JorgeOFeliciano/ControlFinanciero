@@ -40,11 +40,11 @@ const cardGradients = {
 
     'brand_nu': 'linear-gradient(135deg, #82269e 0%, #5d1875 100%)',          // Morado Profundo
     'brand_bbva': 'linear-gradient(135deg, #004481 0%, #1a2d52 100%)',        // Azul Marino
-    'brand_mercado': 'linear-gradient(135deg, #009ee3 0%, #007eb5 100%)',     // Celeste
-    'brand_santander': 'linear-gradient(135deg, #ec0000 0%, #b30000 100%)',   // Rojo Intenso
-    'brand_cashi': 'linear-gradient(135deg, #ff005e 0%, #d6004f 100%)',       // Rosa Mexicano
-    'brand_uala': 'linear-gradient(135deg, #ff5e5e 0%, #e04545 100%)',        // Coral/Rojo
-    'brand_stori': 'linear-gradient(135deg, #00a5a3 0%, #007a79 100%)',       // Verde Agua
+    'brand_mercado': 'linear-gradient(135deg, #009ee3 0%, #007eb5 100%)',      // Celeste
+    'brand_santander': 'linear-gradient(135deg, #ec0000 0%, #b30000 100%)',    // Rojo Intenso
+    'brand_cashi': 'linear-gradient(135deg, #ff005e 0%, #d6004f 100%)',        // Rosa Mexicano
+    'brand_uala': 'linear-gradient(135deg, #ff5e5e 0%, #e04545 100%)',         // Coral/Rojo
+    'brand_stori': 'linear-gradient(135deg, #00a5a3 0%, #007a79 100%)',        // Verde Agua
     'brand_hey': 'linear-gradient(135deg, #000000 0%, #333333 100%)'
 };
 
@@ -227,11 +227,47 @@ function parseDetail(card, sheet) {
     rows.forEach(r => { if (r[0] && typeof r[1] === 'number') card.transactions.push({ desc: r[0], amount: r[1], months: r[2] || 1, paidCycles: r[3] || 0, category: 'General' }); });
 }
 
-// --- CÁLCULOS ---
-function calcCard(c) {
-    let rawDebt = 0;
-    let monthlyPay = 0;
+// --- CÁLCULOS Y FECHAS (ACTUALIZADO) ---
 
+// 1. NUEVA FUNCIÓN: Calcular fechas de corte y pago
+function getCardDates(c) {
+    // Si no tiene datos de corte configurados, devolvemos null o valores por defecto
+    const cutDay = c.cutDay || 1;    // Por defecto día 1
+    const payDays = c.payDays || 20; // Por defecto 20 días para pagar
+
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth(); // 0 = Enero
+
+    // Fecha de corte teórica de ESTE mes
+    let nextCutoff = new Date(currentYear, currentMonth, cutDay);
+
+    // Si hoy ya pasó el día de corte de este mes, el próximo corte es el mes que viene
+    if (today > nextCutoff) {
+        nextCutoff.setMonth(nextCutoff.getMonth() + 1);
+    }
+
+    // Fecha límite de pago = Fecha de corte + Días de gracia
+    let limitDate = new Date(nextCutoff);
+    limitDate.setDate(limitDate.getDate() + payDays);
+
+    // Días faltantes
+    const diffTime = nextCutoff - today;
+    const daysToCutoff = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    return {
+        nextCutoff: nextCutoff,
+        limitDate: limitDate,
+        daysToCutoff: daysToCutoff
+    };
+}
+
+// 2. FUNCIÓN CALC CARD (ACTUALIZADA CON LÓGICA BANCARIA)
+function calcCard(c) {
+    let rawDebt = 0;     // Suma de todas las compras pendientes
+    let monthlyPay = 0;  // Lo que toca pagar este mes
+
+    // 1. Calculamos deuda bruta de las compras (Igual que antes)
     c.transactions.forEach(t => {
         let months = t.months || 1;
         let monthlyAmount = t.amount / months;
@@ -239,18 +275,37 @@ function calcCard(c) {
         let remaining = t.amount - paidAmount;
 
         if (remaining < 0) remaining = 0;
+        
+        // Sumamos a la deuda bruta
         rawDebt += remaining;
 
+        // Si la compra sigue activa, sumamos su mensualidad al "Pago para no generar intereses"
         if (remaining > 0.1) {
             monthlyPay += monthlyAmount;
         }
     });
 
-    let finalDebt = rawDebt - (c.creditBalance || 0);
-    if (finalDebt < 0) finalDebt = 0;
+    // 2. Obtenemos el Saldo a Favor (Tus abonos/pagos)
+    let saldoFavor = c.creditBalance || 0;
 
-    return { debt: finalDebt, raw: rawDebt, avail: c.limit - finalDebt, monthly: monthlyPay };
+    // 3. Cálculo del Disponible (Lógica TDC Real)
+    // El disponible es tu Límite menos lo que debes, más lo que has abonado.
+    // Límite - (Deuda - Abonos) = Límite - Deuda + Abonos
+    let available = c.limit - rawDebt + saldoFavor;
+
+    // 4. Deuda Neta para mostrar (Si abonos > deuda, esto es 0)
+    let netDebt = rawDebt - saldoFavor;
+    if (netDebt < 0) netDebt = 0;
+
+    return { 
+        debt: netDebt,             // Deuda neta (lo que debes pagar hoy para quedar en 0)
+        raw: rawDebt,              // Deuda bruta (suma de compras sin restar abonos)
+        creditBalance: saldoFavor, // El Saldo a Favor acumulado
+        avail: available,          // Disponible (Aquí SÍ suma el saldo a favor)
+        monthly: monthlyPay        // Pago mensual (No se afecta por el saldo a favor en cálculo, solo visual)
+    };
 }
+
 
 // --- UI HELPERS ---
 function getBankClass(name) {
@@ -308,6 +363,71 @@ function updateUI() {
 
     const totalMonthEl = document.getElementById('total-monthly-payment');
     if (totalMonthEl) totalMonthEl.innerText = fmt(tMonthlyGlobal);
+
+    if (!appData.cards) appData.cards = [];
+
+    // 2. Renderizar Grilla de Crédito (Si tienes un div id="credit-grid" en tu HTML en la pestaña #cards)
+    // Si no tienes ese div, te diré dónde ponerlo en el HTML abajo.
+    const cGrid = document.getElementById('credit-grid');
+    if (cGrid) {
+        cGrid.innerHTML = '';
+        
+        appData.cards.forEach((c, i) => {
+            // Lógica de estilos (Igual que débito)
+            let bgStyle = '';
+            const n = c.name.toLowerCase();
+            if (c.color && cardGradients[c.color] && !c.color.startsWith('brand_')) {
+                bgStyle = cardGradients[c.color];
+            } else {
+                // Auto-theme
+                if (n.includes('nu')) bgStyle = cardGradients['brand_nu'];
+                else if (n.includes('bbva')) bgStyle = cardGradients['brand_bbva'];
+                else if (n.includes('amex')) bgStyle = 'linear-gradient(135deg, #2c3e50, #000000)';
+                else if (n.includes('hey')) bgStyle = 'linear-gradient(135deg, #111 0%, #333 100%)';
+                else if (n.includes('stori')) bgStyle = cardGradients['brand_stori'];
+                else if (n.includes('hsbc')) bgStyle = 'linear-gradient(135deg, #db0011 0%, #b0000e 100%)';
+                else bgStyle = cardGradients['dark']; // Default crédito: Oscuro
+            }
+
+            let netIconClass = 'fab fa-cc-visa fa-lg';
+            if (c.network === 'mastercard') netIconClass = 'fab fa-cc-mastercard fa-lg';
+            else if (c.network === 'amex') netIconClass = 'fab fa-cc-amex fa-lg';
+
+            cGrid.innerHTML += `
+            <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+                <div class="mini-card text-white" 
+                     onclick="selectCreditCard(${i})" 
+                     style="background: ${bgStyle};">
+                    
+                    <div class="mb-auto opacity-75">
+                         <i class="${netIconClass}"></i>
+                         <i class="fas fa-trash-alt float-end text-white-50" 
+                            style="cursor:pointer; font-size:0.8rem;" 
+                            onclick="event.stopPropagation(); deleteCreditCard(${i})"></i>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between align-items-end w-100">
+                        <div class="mini-card-name fw-bold pe-2" style="overflow:hidden; text-overflow:ellipsis;">
+                            ${c.name}
+                        </div>
+                        <div class="text-end flex-shrink-0">
+                            <div class="small opacity-75" style="font-size: 0.6rem;">Deuda</div>
+                            <div class="mini-card-balance fw-bold">${fmt(calcCard(c).debt)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        // Botón Nueva Tarjeta Crédito
+        cGrid.innerHTML += `
+        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
+            <div class="mini-card mini-card-add h-100" onclick="openCreditModal()">
+                <i class="fas fa-plus-circle fa-2x mb-2"></i>
+                <span class="small fw-bold">Nueva Tarjeta</span>
+            </div>
+        </div>`;
+    }
 
     // Préstamos
     let tLoansRem = 0; let tCollected = 0; const lb = document.getElementById('loans-body'); lb.innerHTML = '';
@@ -438,8 +558,16 @@ function updateUI() {
 
     document.getElementById('kpi-debt').innerText = fmt(tDebt);
     document.getElementById('kpi-available').innerText = fmt(tLimit - tDebt);
+    // --- CÓDIGO CORREGIDO (SÍ RESTA EL PAGO MENSUAL) ---
     document.getElementById('kpi-loans').innerText = fmt(tLoansRem);
-    const granTotal = tAssets + tDebit + tCollected + appData.incomes.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // 1. Sumamos todo lo positivo (Efectivo + Débito + Recuperado + Ingresos)
+    const dineroPositivo = tAssets + tDebit + tCollected + appData.incomes.reduce((acc, curr) => acc + curr.amount, 0);
+    
+    // 2. RESTAMOS el pago mensual de las tarjetas (tMonthlyGlobal)
+    const granTotal = dineroPositivo - tMonthlyGlobal; 
+
+    // 3. Mostramos el resultado
     document.getElementById('kpi-assets').innerText = fmt(granTotal);
     document.getElementById('total-assets-sum').innerText = fmt(tAssets + tCollected + tDebit);
     document.getElementById('total-income-display').innerText = fmt(tInc);
@@ -1272,44 +1400,153 @@ function adjustColor(color, amount) {
 
 function updateSelectors() { const s = document.getElementById('card-selector'); if (s.options.length !== appData.cards.length) { const v = s.value; s.innerHTML = ''; const cOpt = document.getElementById('custom-select-options'); cOpt.innerHTML = ''; appData.cards.forEach((c, i) => { let o = document.createElement('option'); o.value = i; o.text = c.name; s.add(o); let co = document.createElement('span'); co.className = 'custom-option'; if (i == (v || 0)) co.classList.add('selected'); let ic = '<i class="fas fa-credit-card me-2 opacity-50"></i>'; if (c.name.toLowerCase().includes('nu')) ic = '<i class="fas fa-cube me-2 text-primary"></i>'; if (c.name.toLowerCase().includes('mercado')) ic = '<i class="fas fa-handshake me-2 text-info"></i>'; if (c.name.toLowerCase().includes('bbva')) ic = '<i class="fas fa-university me-2 text-primary"></i>'; co.innerHTML = `${ic} ${c.name}`; co.addEventListener('click', function () { s.value = i; document.getElementById('custom-select-text').innerHTML = this.innerHTML; document.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected')); this.classList.add('selected'); document.getElementById('custom-card-select').classList.remove('open'); renderCardDetail(i) }); cOpt.appendChild(co) }); s.value = v || 0; if (appData.cards.length > 0) { const initIdx = v || 0; const ops = cOpt.querySelectorAll('.custom-option'); if (ops[initIdx]) { document.getElementById('custom-select-text').innerHTML = ops[initIdx].innerHTML; ops[initIdx].classList.add('selected') } renderCardDetail(s.value) } } }
 document.querySelector('.custom-select-trigger').addEventListener('click', function () { document.getElementById('custom-card-select').classList.toggle('open') }); window.addEventListener('click', function (e) { const s = document.getElementById('custom-card-select'); if (!s.contains(e.target)) s.classList.remove('open') });
+
+// --- RENDERIZADO DEL DETALLE DE TARJETA (VERSIÓN FINAL: SOBREPAGO) ---
+// --- RENDERIZADO DEL DETALLE DE TARJETA (RESTANTE A PAGAR EN ROJO) ---
 function renderCardDetail(i) {
     if (!appData.cards[i]) return;
-    const c = appData.cards[i]; const s = calcCard(c);
+    const c = appData.cards[i];
+    
+    // 1. Cálculos
+    const s = calcCard(c); 
+    const dates = getCardDates(c);
     const p = c.limit > 0 ? (s.debt / c.limit) * 100 : 0;
 
-    document.getElementById('card-name').innerText = c.name;
-    document.getElementById('card-limit').innerText = `Lim: ${fmt(c.limit)}`;
-    document.getElementById('credit-balance-alert').classList.toggle('d-none', !(c.creditBalance > 0));
-    document.getElementById('credit-balance-amount').innerText = fmt(c.creditBalance);
+    // A. Textos Superiores
+    const cardNameEl = document.getElementById('card-name');
+    cardNameEl.innerHTML = `
+        ${c.name} 
+        <button class="btn btn-sm btn-link text-white p-0 ms-2 opacity-50" onclick="openCardConfig()" title="Configurar Fechas">
+            <i class="fas fa-cog"></i>
+        </button>
+    `;
+
     document.getElementById('card-used').innerText = fmt(s.debt);
+    document.getElementById('card-limit').innerText = `Lim: ${fmt(c.limit)}`;
     document.getElementById('card-avail').innerText = fmt(s.avail);
 
-    const cm = document.getElementById('card-monthly'); if (cm) cm.innerText = fmt(s.monthly);
+    // B. Fechas
+    const dateCutEl = document.getElementById('card-date-cut');
+    const datePayEl = document.getElementById('card-date-pay');
+    const formatDate = (d) => d.toLocaleDateString('es-MX', {day: 'numeric', month: 'short'}).replace('.', '');
+    if (dateCutEl) dateCutEl.innerText = formatDate(dates.nextCutoff);
+    if (datePayEl) datePayEl.innerText = formatDate(dates.limitDate);
+
+
+    // --- C. LÓGICA CENTRAL Y ESTILOS ---
+    const cm = document.getElementById('card-monthly'); 
+    
+    if (cm) {
+        const today = new Date();
+        const currentDay = today.getDate();
+        const cutoffDay = c.cutDay || 32; 
+        const label = cm.previousElementSibling; 
+        
+        // Colores personalizados
+        const brightGreenColor = "#2ecc71";
+        const brightRedColor = "#ff6b6b"; // Color para la etiqueta de deuda
+
+        const currentPeriodId = `${today.getFullYear()}-${today.getMonth()}`;
+        const isMonthPaid = (c.lastPaidPeriod === currentPeriodId);
+
+        if (currentDay > cutoffDay) {
+            // >>> DENTRO DEL LAPSO DE PAGO (URGENCIA)
+            
+            if (isMonthPaid) {
+                // YA PAGADO (SOBREPAGO O EXACTO)
+                if (c.creditBalance > 0.01) {
+                    if(label) label.innerText = "SALDO A FAVOR";
+                    cm.innerText = fmt(c.creditBalance); 
+                    cm.className = "card-money-big text-success-bright fw-bold";
+                    if(label) { label.className = "card-label fw-bold"; label.style.color = brightGreenColor; }
+                } else {
+                    if(label) label.innerText = "PAGO CUBIERTO";
+                    cm.innerText = fmt(0); 
+                    cm.className = "card-money-big text-success-bright fw-bold";
+                    if(label) { label.className = "card-label fw-bold"; label.style.color = brightGreenColor; }
+                }
+                
+            } else {
+                // AÚN NO PAGADO (DEUDA ACTIVA)
+                let netMonthly = s.monthly - c.creditBalance;
+                if (netMonthly < 0) netMonthly = 0;
+                
+                if (netMonthly > 0.01) {
+                    // >>> AQUÍ ESTÁ EL CAMBIO: ROJO BRILLANTE <<<
+                    if(label) label.innerText = "RESTANTE A PAGAR";
+                    cm.innerText = fmt(netMonthly); 
+                    
+                    // Texto del monto en ROJO BRILLANTE
+                    cm.className = "card-money-big text-danger-bright fw-bold"; 
+                    
+                    // Etiqueta en ROJO o AMARILLO (Como prefieras, rojo es más urgente)
+                    if(label) { label.className = "card-label fw-bold"; label.style.color = brightRedColor; }
+
+                } else {
+                    // Cubierto solo con saldo (sin aplicar liquidación)
+                    if(label) label.innerText = "PAGO CUBIERTO";
+                    cm.innerText = fmt(0);
+                    cm.className = "card-money-big text-success-bright fw-bold";
+                    if(label) { label.className = "card-label fw-bold"; label.style.color = brightGreenColor; }
+                }
+            }
+
+        } else {
+            // >>> FUERA DEL LAPSO (TRANQUILIDAD)
+            
+            if (c.creditBalance > 0.01) {
+                if(label) label.innerText = "SALDO A FAVOR";
+                cm.innerText = fmt(c.creditBalance); 
+                cm.className = "card-money-big text-success-bright fw-bold";
+                if(label) { label.className = "card-label fw-bold"; label.style.color = brightGreenColor; }
+
+            } else {
+                if(label) label.innerText = "CONSUMO ACTUAL";
+                cm.innerText = fmt(s.monthly);
+                cm.className = "card-money-big text-white fw-bold"; 
+                if(label) { label.className = "card-label text-white opacity-75 fw-bold"; label.style.color = ""; }
+            }
+        }
+    }
+
+    // D. Barra y Fondo
     document.getElementById('card-percent-text').innerText = `${p.toFixed(1)}%`;
     document.getElementById('card-progress').style.width = `${p}%`;
+    
     const h = document.getElementById('card-visual-bg');
     const n = c.name.toLowerCase();
-
     let bg = 'linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)';
-    if (n.includes('nu')) bg = 'linear-gradient(135deg, #82269e 0%, #a450c0 100%)';
-    else if (n.includes('bbva')) bg = 'linear-gradient(135deg, #004481 0%, #2dcccd 100%)';
-    else if (n.includes('santander')) bg = 'linear-gradient(135deg, #ec0000 0%, #ff4b4b 100%)';
-    else if (n.includes('mercado')) bg = 'linear-gradient(135deg, #009ee3 0%, #00c6fb 100%)';
-    else if (n.includes('stori')) bg = 'linear-gradient(135deg, #00a5a3 0%, #35dcb4 100%)';
-    else if (n.includes('didi')) bg = 'linear-gradient(135deg, #ff7e00 0%, #ffac4d 100%)';
+    
+    if (n.includes('nu')) bg = 'linear-gradient(135deg, #82269e 0%, #5d1875 100%)';
+    else if (n.includes('bbva')) bg = 'linear-gradient(135deg, #004481 0%, #1a2d52 100%)';
+    else if (n.includes('mercado')) bg = 'linear-gradient(135deg, #009ee3 0%, #007eb5 100%)';
+    else if (n.includes('santander')) bg = 'linear-gradient(135deg, #ec0000 0%, #b30000 100%)';
+    else if (n.includes('cashi')) bg = 'linear-gradient(135deg, #ff005e 0%, #d6004f 100%)';
+    else if (n.includes('uala')) bg = 'linear-gradient(135deg, #ff5e5e 0%, #e04545 100%)';
+    else if (n.includes('stori')) bg = 'linear-gradient(135deg, #00a5a3 0%, #007a79 100%)';
+    
     h.style.background = bg;
 
-    const t = document.getElementById('transactions-body'); t.innerHTML = '';
+    // E. Tabla
+    const t = document.getElementById('transactions-body'); 
+    t.innerHTML = '';
+    
     if (c.transactions.length === 0) {
         t.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">Sin movimientos</td></tr>`;
     } else {
         c.transactions.forEach((x, ix) => {
-            let pd = (x.amount / (x.months || 1)) * (x.paidCycles || 0);
-            let r = x.amount - pd; if (r < 0) r = 0;
+            let monthlyAmt = x.amount / (x.months || 1);
+            let paidAmount = monthlyAmt * (x.paidCycles || 0);
+            let remaining = x.amount - paidAmount;
+            if (remaining < 0) remaining = 0;
+            
+            let isPayment = x.amount < 0;
+            let amountClass = isPayment ? 'text-success-bright fw-bold' : 'text-muted';
+            let rowClass = isPayment ? 'table-success bg-opacity-10' : '';
             let catIcon = getCategoryIcon(x.category || 'General');
 
             t.innerHTML += `
-            <tr>
+            <tr class="${rowClass}">
                 <td>
                     <div class="d-flex align-items-center">
                         <div class="me-3 fs-5">${catIcon}</div>
@@ -1319,9 +1556,9 @@ function renderCardDetail(i) {
                         </div>
                     </div>
                 </td>
-                <td><span class="badge bg-light text-dark border">${x.months} M</span></td>
-                <td class="text-end text-muted small">${fmt(x.amount)}</td>
-                <td class="text-end fw-bold text-dark">${fmt(r)}</td>
+                <td class="text-center"><span class="badge bg-light text-dark border">${x.months} M</span></td>
+                <td class="text-end ${amountClass} small">${fmt(x.amount)}</td>
+                <td class="text-end fw-bold text-dark">${fmt(remaining)}</td>
                 <td class="text-end">
                     <button class="btn-icon btn-icon-del shadow-sm" onclick="delTransaction(${ix})"><i class="fas fa-trash text-danger" style="font-size:0.8rem"></i></button>
                 </td>
@@ -1329,8 +1566,6 @@ function renderCardDetail(i) {
         });
     }
 }
-
-// --- V0.12: FUNCIONES DE SISTEMA (BACKUP & PRIVACIDAD) ---
 
 function togglePrivacy() {
     document.body.classList.toggle('privacy-active');
@@ -1356,6 +1591,59 @@ function downloadBackup() {
 function openRestoreModal() {
     document.getElementById('backup-file-input').value = '';
     new bootstrap.Modal(document.getElementById('restoreBackupModal')).show();
+}
+
+// --- CONFIGURACIÓN DE FECHAS (NUEVO) ---
+
+// 1. Abrir el modal con los datos actuales
+function openCardConfig() {
+    // Detectamos qué tarjeta está seleccionada actualmente
+    let idx = -1;
+    if (typeof currentDetailCardIndex !== 'undefined' && currentDetailCardIndex !== -1) {
+        idx = currentDetailCardIndex;
+    } else {
+        const sel = document.getElementById('card-selector');
+        if (sel && sel.value !== "") idx = parseInt(sel.value);
+    }
+
+    if (idx === -1 || !appData.cards[idx]) {
+        showToast('Selecciona una tarjeta primero', 'error');
+        return;
+    }
+
+    const c = appData.cards[idx];
+    
+    // Llenamos los campos
+    document.getElementById('cfg-card-index').value = idx;
+    document.getElementById('cfg-cut-day').value = c.cutDay || '';
+    document.getElementById('cfg-pay-days').value = c.payDays || 20;
+
+    new bootstrap.Modal(document.getElementById('configCardModal')).show();
+}
+
+// 2. Guardar los cambios
+function saveCardConfig() {
+    const idx = parseInt(document.getElementById('cfg-card-index').value);
+    const cutDay = parseInt(document.getElementById('cfg-cut-day').value);
+    const payDays = parseInt(document.getElementById('cfg-pay-days').value);
+
+    if (appData.cards[idx]) {
+        if (cutDay > 0 && cutDay <= 31) {
+            appData.cards[idx].cutDay = cutDay;
+            appData.cards[idx].payDays = payDays || 20;
+            
+            saveData();
+            updateUI(); // Recalcula todo
+            
+            // Refrescamos la vista de detalle
+            renderCardDetail(idx);
+            
+            bootstrap.Modal.getInstance(document.getElementById('configCardModal')).hide();
+            showToast('✅ Fechas actualizadas correctamente');
+        } else {
+            showToast('Ingresa un día de corte válido (1-31)', 'error');
+        }
+    }
 }
 
 function processRestoreFile() {
@@ -1451,53 +1739,340 @@ function fillFullDebt() {
     calcRemainingBalance();
 }
 
-function calcRemainingBalance() {
-    const select = document.getElementById('pay-source-account');
-    const amountIn = document.getElementById('pay-card-amount').value;
-    const display = document.getElementById('pay-remaining-balance');
-
-    if (select.selectedIndex === -1) return;
-
-    const currentBalance = parseFloat(select.options[select.selectedIndex].getAttribute('data-balance'));
-    const amountToPay = parseFloat(amountIn) || 0;
-    const remaining = currentBalance - amountToPay;
-
-    display.innerText = fmt(remaining);
-    if (remaining < 0) {
-        display.className = "fw-bold text-danger";
-        display.innerText = "Saldo Insuficiente";
+// CORRECCIÓN V0.26: Cálculo de saldo restante en modal de pago
+// 1. ABRIR MODAL DE PAGO (CORREGIDO: Valores correctos y sin doble $)
+function openPayCardModal() {
+    // Validamos si hay tarjeta seleccionada en el panel nuevo o en el selector viejo
+    let cardIdx = -1;
+    if (typeof currentDetailCardIndex !== 'undefined' && currentDetailCardIndex !== -1) {
+        cardIdx = currentDetailCardIndex;
     } else {
-        display.className = "fw-bold text-success";
+        const sel = document.getElementById('card-selector');
+        if (sel && sel.value !== "") cardIdx = parseInt(sel.value);
+    }
+
+    if (cardIdx === -1 || !appData.cards[cardIdx]) { 
+        showToast('Selecciona una tarjeta primero', 'error'); 
+        return; 
+    }
+
+    // Llenar datos visuales
+    document.getElementById('pay-card-target-name').innerText = appData.cards[cardIdx].name;
+    const sourceSelect = document.getElementById('pay-source-account');
+    sourceSelect.innerHTML = '';
+
+    // A. Agregar Cuentas de Débito
+    const groupDebit = document.createElement('optgroup');
+    groupDebit.label = "Cuentas de Débito";
+    appData.debit.forEach((acc, idx) => {
+        let opt = document.createElement('option');
+        opt.value = `debit_${idx}`; // IMPORTANTE: Agregamos el prefijo 'debit_'
+        // Corrección visual: fmt ya trae el $, lo quitamos del string manual
+        opt.text = `${acc.name} (Disp: ${fmt(acc.balance)})`; 
+        groupDebit.appendChild(opt);
+    });
+    sourceSelect.add(groupDebit);
+
+    // B. Agregar Efectivo
+    const groupAsset = document.createElement('optgroup');
+    groupAsset.label = "Efectivo / Activos";
+    appData.assets.forEach((acc, idx) => {
+        let opt = document.createElement('option');
+        opt.value = `asset_${idx}`; // IMPORTANTE: Agregamos el prefijo 'asset_'
+        opt.text = `${acc.name} (Disp: ${fmt(acc.amount)})`;
+        groupAsset.appendChild(opt);
+    });
+    sourceSelect.add(groupAsset);
+
+    // Limpiar campos
+    document.getElementById('pay-card-amount').value = '';
+    document.getElementById('pay-remaining-balance').innerText = '---';
+    
+    new bootstrap.Modal(document.getElementById('payCardModal')).show();
+}
+
+// 2. CALCULAR SALDO RESTANTE (CORREGIDO: Parsea bien el value 'tipo_idx')
+function calcRemainingBalance() {
+    const sourceVal = document.getElementById('pay-source-account').value;
+    const payAmount = parseFloat(document.getElementById('pay-card-amount').value) || 0;
+    const displaySpan = document.getElementById('pay-remaining-balance');
+    
+    if (!sourceVal) return;
+
+    // Separamos "debit_0" en ["debit", "0"]
+    const parts = sourceVal.split('_');
+    const type = parts[0];
+    const idx = parseInt(parts[1]);
+    
+    let currentBalance = 0;
+    if (type === 'debit') currentBalance = appData.debit[idx].balance;
+    else if (type === 'asset') currentBalance = appData.assets[idx].amount;
+
+    const finalBalance = currentBalance - payAmount;
+    
+    // fmt() ya pone el signo $, así que solo lo asignamos
+    displaySpan.innerText = fmt(finalBalance); 
+    
+    // Colores: Rojo si no alcanza, Verde si sí
+    if (finalBalance < 0) {
+        displaySpan.className = 'fw-bold text-danger';
+    } else {
+        displaySpan.className = 'fw-bold text-success';
     }
 }
 
+// --- PROCESAR PAGO (CORREGIDO: BORRA COMPRAS TERMINADAS 18/18) ---
 function processCardPayment() {
-    const cardIdx = document.getElementById('card-selector').value;
-    const debitIdx = document.getElementById('pay-source-account').value;
+    // 1. Validaciones Iniciales
+    let cardIdx = -1;
+    if (typeof currentDetailCardIndex !== 'undefined' && currentDetailCardIndex !== -1) {
+        cardIdx = currentDetailCardIndex;
+    } else {
+        const sel = document.getElementById('card-selector');
+        if (sel && sel.value !== "") cardIdx = parseInt(sel.value);
+    }
+
+    if (cardIdx === -1 || !appData.cards[cardIdx]) {
+        showToast('Error: Tarjeta no seleccionada', 'error');
+        return;
+    }
+
+    const card = appData.cards[cardIdx];
+    const sourceVal = document.getElementById('pay-source-account').value;
     const amount = parseFloat(document.getElementById('pay-card-amount').value);
 
-    if (!amount || amount <= 0) { showToast('Ingresa un monto válido', 'error'); return; }
-    const debitAcc = appData.debit[debitIdx];
-    if (debitAcc.balance < amount) { showToast(`Fondos insuficientes en ${debitAcc.name}`, 'error'); return; }
+    if (isNaN(amount) || amount <= 0) { showToast('Ingresa un monto válido', 'warning'); return; }
+    if (!sourceVal) { showToast('Selecciona cuenta de origen', 'warning'); return; }
 
-    // Cerrar modal de datos
+    // 2. Descontar dinero del Origen
+    const [type, idx] = sourceVal.split('_');
+    const sourceIdx = parseInt(idx);
+    let sourceName = '';
+
+    if (type === 'debit') {
+        if (appData.debit[sourceIdx].balance < amount) { showToast(`Fondos insuficientes`, 'error'); return; }
+        appData.debit[sourceIdx].balance -= amount;
+        sourceName = appData.debit[sourceIdx].name;
+    } else if (type === 'asset') {
+        if (appData.assets[sourceIdx].amount < amount) { showToast(`Fondos insuficientes`, 'error'); return; }
+        appData.assets[sourceIdx].amount -= amount;
+        sourceName = appData.assets[sourceIdx].name;
+    }
+
+    // --- 3. LÓGICA DE APLICACIÓN DE PAGO ---
+    const s = calcCard(card);
+    const today = new Date();
+    const currentDay = today.getDate();
+    const cutoffDay = card.cutDay || 32;
+
+    // Solo si estamos DESPUÉS del corte aplicamos lógica MSI
+    if (currentDay > cutoffDay) {
+        
+        const totalAvailable = amount + (card.creditBalance || 0);
+        
+        // Si cubrimos el pago mensual
+        if (totalAvailable >= s.monthly - 0.1) {
+            
+            let finishedItems = [];
+            
+            // A. Actualizar contadores
+            card.transactions.forEach(t => {
+                let months = parseInt(t.months) || 1;
+                let paidAmt = (t.amount / months) * (t.paidCycles || 0);
+                let remaining = t.amount - paidAmt;
+
+                // Si la compra tenía deuda pendiente, sumamos 1 mes pagado
+                if (remaining > 0.1) {
+                    t.paidCycles = (t.paidCycles || 0) + 1;
+                    
+                    // Si llegamos al final (ej. 18 de 18) guardamos el nombre
+                    if (t.paidCycles >= months) {
+                        finishedItems.push(t.desc);
+                    }
+                }
+            });
+
+            // B. BORRADO AUTOMÁTICO (Aquí estaba el detalle)
+            // Filtramos la lista: Solo sobreviven las compras donde (pagos < meses)
+            // Usamos parseInt para asegurar que comparamos números reales
+            card.transactions = card.transactions.filter(t => {
+                const p = t.paidCycles || 0;
+                const m = parseInt(t.months) || 1;
+                return p < m; // Si p=18 y m=18, devuelve false y SE BORRA.
+            });
+
+            // C. Ajustar Saldo y Marcar Pagado
+            card.creditBalance = totalAvailable - s.monthly;
+            
+            const periodId = `${today.getFullYear()}-${today.getMonth()}`;
+            card.lastPaidPeriod = periodId;
+
+            // D. Feedback
+            if (finishedItems.length > 0) {
+                showToast(`🎉 ¡Pagado! Se eliminó: ${finishedItems[0]}...`);
+            } else {
+                showToast(`✅ Meses actualizados (+1)`);
+            }
+
+        } else {
+            // Pago Parcial
+            card.creditBalance = (card.creditBalance || 0) + amount;
+            showToast(`Abonado a Saldo a Favor`);
+        }
+
+    } else {
+        // Antes del corte
+        card.creditBalance = (card.creditBalance || 0) + amount;
+        showToast(`Guardado para el corte`);
+    }
+
+    // 4. Guardar y Refrescar
+    if (typeof addLog === 'function') addLog('pago', `Pago a ${card.name}`, amount);
+    
+    saveData();
+    updateUI();
+    if (typeof renderCardDetail === 'function') renderCardDetail(cardIdx);
+    
     bootstrap.Modal.getInstance(document.getElementById('payCardModal')).hide();
+}
+// V0.26: CREAR TARJETA DE CRÉDITO
+// --- NUEVAS FUNCIONES DE CRÉDITO ---
 
-    // Confirmación
-    const msg = `Vas a pagar <strong>${fmt(amount)}</strong><br>a ${appData.cards[cardIdx].name} desde ${debitAcc.name}`;
-    askConfirmation(msg, () => {
-        debitAcc.balance -= amount;
-        if (!appData.cards[cardIdx].creditBalance) appData.cards[cardIdx].creditBalance = 0;
-        appData.cards[cardIdx].creditBalance += amount;
-
-        // LOG V0.15
-        addLog('pago', `Pago a tarjeta ${appData.cards[cardIdx].name}`, amount);
-
-        saveData(); updateUI(); renderCardDetail(cardIdx);
-        showToast(`✅ Pago aplicado correctamente`);
-    });
+function openCreditModal() {
+    document.getElementById('new-cc-name').value = '';
+    document.getElementById('new-cc-limit').value = '';
+    
+    // Limpiar campos de fecha también
+    document.getElementById('new-cc-cut-day').value = '';
+    document.getElementById('new-cc-pay-days').value = '20'; // Valor sugerido
+    
+    updateCCPreview();
+    new bootstrap.Modal(document.getElementById('addCreditModal')).show();
 }
 
+function updateCCPreview() {
+    const name = document.getElementById('new-cc-name').value || 'NOMBRE';
+    const limit = document.getElementById('new-cc-limit').value || 0;
+    const net = document.getElementById('new-cc-network').value;
+    const color = document.querySelector('input[name="cc-color"]:checked').value;
+    
+    document.getElementById('prev-cc-name').innerText = name;
+    document.getElementById('prev-cc-limit').innerText = fmt(parseFloat(limit));
+    document.getElementById('prev-cc-icon').className = `fab fa-cc-${net} fa-lg`;
+    
+    const bgMap = {
+        'dark': '#333', 'blue': '#00b4db', 'purple': '#82269e', 'gold': '#f7971e'
+    };
+    document.getElementById('new-credit-preview-box').style.background = bgMap[color];
+}
+
+function createCreditCard() {
+    const name = document.getElementById('new-cc-name').value;
+    const limit = parseFloat(document.getElementById('new-cc-limit').value);
+    const net = document.getElementById('new-cc-network').value;
+    const color = document.querySelector('input[name="cc-color"]:checked').value;
+    
+    // OBTENER LAS FECHAS DEL FORMULARIO
+    // Si el usuario lo deja vacío, ponemos 14 y 20 por defecto para que no falle la lógica
+    const cutDay = parseInt(document.getElementById('new-cc-cut-day').value) || 14;
+    const payDays = parseInt(document.getElementById('new-cc-pay-days').value) || 20;
+    
+    if(name && limit > 0) {
+        if(!appData.cards) appData.cards = [];
+        
+        appData.cards.push({
+            name: name, 
+            limit: limit, 
+            balance: 0, 
+            network: net, 
+            color: color, 
+            transactions: [],
+            // GUARDAMOS LAS FECHAS AQUÍ
+            cutDay: cutDay,
+            payDays: payDays
+        });
+        
+        saveData(); 
+        updateUI();
+        bootstrap.Modal.getInstance(document.getElementById('addCreditModal')).hide();
+        showToast('Tarjeta creada con fechas configuradas');
+    } else {
+        alert("Por favor ingresa un nombre y límite válido");
+    }
+}
+
+// --- FUNCIÓN CORREGIDA: VALIDAR DEUDA ANTES DE BORRAR ---
+
+function deleteCurrentCreditCard() {
+    let idx = -1;
+    
+    // 1. Índice activo real
+    if (typeof currentDetailCardIndex !== 'undefined' && currentDetailCardIndex !== -1) {
+        idx = currentDetailCardIndex;
+    } else {
+        const select = document.getElementById('card-selector');
+        if (select && select.value !== '') idx = parseInt(select.value);
+    }
+
+    if (idx === -1 || !appData.cards[idx]) return;
+
+    const card = appData.cards[idx];
+    const debt = calcCard(card).debt;
+
+    // 2. BLOQUEO SI TIENE DEUDA REAL
+    if (debt > 1.0) {
+        const deudaFormat = fmt(debt);
+        const disponible = fmt(card.limit - debt);
+
+        document.getElementById('cant-delete-msg').innerHTML = `
+            No puedes eliminar la tarjeta <strong>"${card.name}"</strong>.<br><br>
+            <span class="text-danger fw-bold">Tienes una deuda de: ${deudaFormat}</span><br>
+            <span class="text-muted small">Disponible actual: ${disponible}</span><br><br>
+            Debes liquidarla completamente antes de eliminarla.
+        `;
+
+        new bootstrap.Modal(
+            document.getElementById('cantDeleteModal')
+        ).show();
+
+        return;
+    }
+
+    // 3. CONFIRMACIÓN FINAL
+    document.getElementById('del-confirm-card-name').innerText = card.name;
+    document.getElementById('del-confirm-idx').value = idx;
+
+    new bootstrap.Modal(
+        document.getElementById('deleteCardConfirmModal')
+    ).show();
+}
+
+
+// Función que realmente borra (Vinculada al botón "Sí, Eliminar" del modal)
+// Función que realmente borra (Vinculada al botón "Sí, Eliminar" del modal)
+function executeCardDelete() {
+    const idx = parseInt(document.getElementById('del-confirm-idx').value);
+    
+    if (appData.cards[idx]) {
+        // Borrar del array
+        appData.cards.splice(idx, 1);
+        saveData();
+        
+        // Cerrar modales y paneles
+        const modalEl = document.getElementById('deleteCardConfirmModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+        
+        // Ocultar el panel de detalles porque la tarjeta ya no existe
+        if (document.getElementById('credit-card-detail-panel')) {
+            document.getElementById('credit-card-detail-panel').classList.add('d-none');
+        }
+        
+        // Actualizar toda la interfaz
+        updateUI(); 
+        showToast('Tarjeta eliminada correctamente');
+    }
+}
 // --- LÓGICA DE DEPÓSITO ESPECÍFICA (CORREGIDA) ---
 
 
@@ -1608,6 +2183,5 @@ function confirmDeleteTransaction() {
 function addNewLoan() { const n = document.getElementById('nl-name').value; const a = parseFloat(document.getElementById('nl-amount').value); if (n && a) { appData.loans.push({ name: n, original: a, paid: 0 }); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addLoanModal')).hide(); document.getElementById('nl-name').value = ''; document.getElementById('nl-amount').value = '' } }
 function openPayModal(i, n) { document.getElementById('pay-label').innerText = `Abonar a: ${n}`; document.getElementById('pay-idx').value = i; document.getElementById('pay-amount').value = ''; new bootstrap.Modal(document.getElementById('payModal')).show() }
 function submitPay() { const i = document.getElementById('pay-idx').value; const a = parseFloat(document.getElementById('pay-amount').value); if (a > 0) { appData.loans[i].paid += a; saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('payModal')).hide() } }
-
 function loadData() { const s = localStorage.getItem('finanzasApp_Split_v1'); if (s) appData = JSON.parse(s); }
 function saveData() { localStorage.setItem('finanzasApp_Split_v1', JSON.stringify(appData)); }

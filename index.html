@@ -151,21 +151,29 @@
 
                     <div class="tab-pane fade" id="cards">
                         <div class="row g-3">
+                            
                             <div class="col-md-4">
                                 <div class="card card-custom p-4 h-100 border-0 shadow-sm">
-                                    <div class="d-flex align-items-center mb-3">
-                                        <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-3 text-primary">
-                                            <i class="fas fa-sliders-h fa-lg"></i>
+                                    
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <div class="bg-primary bg-opacity-10 p-2 rounded-circle me-3 text-primary">
+                                                <i class="fas fa-sliders-h fa-lg"></i>
+                                            </div>
+                                            <div>
+                                                <h6 class="fw-bold mb-0">Panel de Control</h6>
+                                                <small class="text-muted">Gestiona tus tarjetas</small>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h6 class="fw-bold mb-0">Panel de Control</h6>
-                                            <small class="text-muted">Gestiona tus movimientos</small>
-                                        </div>
+                                        <button class="btn btn-sm btn-outline-primary rounded-circle" onclick="openCreditModal()" title="Nueva Tarjeta de Crédito">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
                                     </div>
                                     
                                     <hr class="text-muted opacity-25 mb-4">
                                     
                                     <label class="fw-bold small mb-2 text-muted text-uppercase">Seleccionar Tarjeta</label>
+                                    
                                     <select id="card-selector" style="display: none;"></select>
                                     
                                     <div class="custom-select-wrapper mb-4" id="custom-card-select">
@@ -176,49 +184,67 @@
                                         <div class="custom-options" id="custom-select-options"></div>
                                     </div>
                                     
-                                    <button class="btn btn-gradient w-100 rounded-pill py-2 fw-bold mb-3" onclick="openPurchaseModal()">
-                                        <i class="fas fa-plus-circle me-2"></i>Registrar Nueva Compra
+                                    <button class="btn btn-gradient w-100 rounded-pill py-2 fw-bold mb-3 shadow-sm" onclick="openPurchaseModal()">
+                                        <i class="fas fa-plus-circle me-2"></i>Registrar Compra
                                     </button>
 
                                     <button class="btn btn-outline-success w-100 rounded-pill py-2 fw-bold mb-3" onclick="openPayCardModal()">
                                         <i class="fas fa-money-bill-wave me-2"></i>Pagar Tarjeta
                                     </button>
                                     
-                                    <div class="alert alert-light border-0 bg-light rounded-3 small text-muted d-flex align-items-start mt-auto">
+                                    <button class="btn btn-link text-danger text-decoration-none btn-sm w-100 mt-2" onclick="deleteCurrentCreditCard()">
+                                        <i class="fas fa-trash-alt me-2"></i>Cancelar/Eliminar Tarjeta
+                                    </button>
+
+                                    <div class="alert alert-light border-0 bg-light rounded-3 small text-muted d-flex align-items-start mt-auto pt-3">
                                         <i class="fas fa-info-circle me-2 mt-1 text-primary"></i>
-                                        <div><strong>Tip:</strong> Las compras manuales se suman al Excel.</div>
+                                        <div><strong>Nota:</strong> Las compras manuales se suman a las detectadas en tu Excel automáticamente.</div>
                                     </div>
                                 </div>
                             </div>
                             
                             <div class="col-md-8">
                                 <div class="card-visual-container">
+                                    
                                     <div class="credit-card-header" id="card-visual-bg">
                                         <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
                                             <div>
                                                 <div class="card-chip"></div>
                                                 <h5 class="mb-0 fw-bold" id="card-name" style="letter-spacing: 1px;">...</h5>
                                             </div>
-                                            <i class="fab fa-cc-visa fa-2x opacity-50"></i>
+                                            <i class="fab fa-cc-visa fa-2x opacity-50" id="card-visual-icon"></i>
                                         </div>
                                         
                                         <div class="mt-4 position-relative" style="z-index: 2;">
-                                            <div class="row">
-                                                <div class="col-4">
+                                            <div class="row text-center">
+                                                <div class="col-4 border-end border-white border-opacity-25">
                                                     <div class="card-label">Deuda Total</div>
                                                     <div class="card-money-small" style="font-size: 1.2rem;" id="card-used">$0.00</div>
                                                 </div>
-                                                <div class="col-4 text-center border-start border-end border-white border-opacity-25">
+                                                <div class="col-4 border-end border-white border-opacity-25">
                                                     <div class="card-label text-warning fw-bold">Pago Mensual</div>
                                                     <div class="card-money-big" style="font-size: 1.5rem;" id="card-monthly">$0.00</div>
                                                 </div>
-                                                <div class="col-4 text-end">
+                                                <div class="col-4">
                                                     <div class="card-label">Disponible</div>
                                                     <div class="card-money-small" style="font-size: 1.2rem;" id="card-avail">$0.00</div>
                                                 </div>
                                             </div>
-                                            <div class="text-center mt-2 small opacity-50" id="card-limit">Límite: $0.00</div>
-                                        </div>
+
+                                            <div class="d-flex justify-content-between align-items-end mt-3 px-2">
+                                                <div class="text-start">
+                                                    <div class="small opacity-50" style="font-size: 0.6rem; text-transform: uppercase;">Próx. Corte</div>
+                                                    <div class="fw-bold" id="card-date-cut" style="font-size: 0.9rem;">--/--</div>
+                                                </div>
+
+                                                <div class="text-center small opacity-50" id="card-limit" style="font-size: 0.75rem;">Límite: $0.00</div>
+
+                                                <div class="text-end">
+                                                    <div class="small opacity-50" style="font-size: 0.6rem; text-transform: uppercase;">Límite Pago</div>
+                                                    <div class="fw-bold" id="card-date-pay" style="font-size: 0.9rem;">--/--</div>
+                                                </div>
+                                            </div>
+                                            </div>
 
                                         <div class="mt-3 position-relative" style="z-index: 2;">
                                             <div class="d-flex justify-content-between small mb-1">
@@ -230,13 +256,12 @@
                                             </div>
                                         </div>
                                     </div>
-
                                     <div class="p-4 transactions-container">
                                         <div id="credit-balance-alert" class="alert alert-success border-0 bg-success bg-opacity-10 text-success d-flex align-items-center d-none mb-4">
                                             <i class="fas fa-check-circle fa-lg me-3"></i>
                                             <div>
                                                 <div class="fw-bold">Saldo a Favor</div>
-                                                <div class="small">Tienes <strong id="credit-balance-amount">$0.00</strong> extra.</div>
+                                                <div class="small">Tienes <strong id="credit-balance-amount">$0.00</strong> extra pagados a esta tarjeta.</div>
                                             </div>
                                         </div>
 
@@ -245,11 +270,11 @@
                                         </h6>
                                         
                                         <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
-                                            <table class="table table-fancy w-100 mb-0">
+                                            <table class="table table-fancy w-100 mb-0 align-middle">
                                                 <thead class="sticky-top">
                                                     <tr>
                                                         <th>Concepto</th>
-                                                        <th>Plazo</th>
+                                                        <th class="text-center">Plazo</th>
                                                         <th class="text-end">Monto Orig.</th>
                                                         <th class="text-end">Por Pagar</th>
                                                         <th class="text-end"></th>
@@ -374,7 +399,7 @@
                     <input type="hidden" id="pay-idx">
                 </div>
                 <div class="modal-footer border-top-0">
-                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="submitPay()">Confirmar Pago</button>
+                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="submitPayCard()">Confirmar Pago</button>
                 </div>
             </div>
         </div>
@@ -611,6 +636,148 @@
                 <div class="modal-header border-bottom-0"><h6 class="modal-title fw-bold"><i class="fas fa-history me-2"></i>Últimos Movimientos</h6><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-0"><div id="history-list-body" class="p-3"></div></div>
                 <div class="modal-footer border-top-0 pt-0"><button type="button" class="btn btn-light w-100 rounded-pill btn-sm" data-bs-dismiss="modal">Cerrar</button></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="addCreditModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h6 class="modal-title fw-bold">Nueva Tarjeta de Crédito</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    
+                    <div class="text-center mb-3">
+                        <div class="d-inline-block rounded-3 p-3 text-white shadow-sm" id="new-credit-preview-box" style="width: 100%; max-width: 280px; height: 160px; background: #333; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="d-flex justify-content-between"><i class="fas fa-wifi opacity-50"></i><i class="fab fa-cc-visa fa-lg" id="prev-cc-icon"></i></div>
+                            <div class="text-start"><div class="small opacity-50">BANCO</div><div class="fw-bold" id="prev-cc-name">NOMBRE</div></div>
+                            <div class="text-end"><div class="small opacity-50">LÍMITE</div><div class="fw-bold" id="prev-cc-limit">$0.00</div></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="small text-muted fw-bold">Nombre</label>
+                            <input type="text" id="new-cc-name" class="form-control" placeholder="Ej. Nu, BBVA Oro" oninput="updateCCPreview()">
+                        </div>
+                        
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold">Límite ($)</label>
+                            <input type="number" id="new-cc-limit" class="form-control" placeholder="0.00" oninput="updateCCPreview()">
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold">Red</label>
+                            <select id="new-cc-network" class="form-select" onchange="updateCCPreview()">
+                                <option value="visa">Visa</option><option value="mastercard">Mastercard</option><option value="amex">Amex</option>
+                            </select>
+                        </div>
+
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold">📅 Día de Corte</label>
+                            <input type="number" id="new-cc-cut-day" class="form-control" placeholder="Ej. 14" min="1" max="31">
+                        </div>
+                        <div class="col-6">
+                            <label class="small text-muted fw-bold">⏳ Días de Pago</label>
+                            <input type="number" id="new-cc-pay-days" class="form-control" placeholder="Ej. 20" value="20">
+                        </div>
+                        <div class="col-12 mt-3">
+                            <label class="small text-muted fw-bold mb-2">Color</label>
+                            <div class="d-flex gap-2 justify-content-center flex-wrap">
+                                <input type="radio" class="btn-check" name="cc-color" id="ccc_dark" value="dark" checked onclick="updateCCPreview()"><label class="btn rounded-circle" for="ccc_dark" style="background: #333; width: 30px; height: 30px;"></label>
+                                <input type="radio" class="btn-check" name="cc-color" id="ccc_blue" value="blue" onclick="updateCCPreview()"><label class="btn rounded-circle" for="ccc_blue" style="background: #00b4db; width: 30px; height: 30px;"></label>
+                                <input type="radio" class="btn-check" name="cc-color" id="ccc_purple" value="purple" onclick="updateCCPreview()"><label class="btn rounded-circle" for="ccc_purple" style="background: #82269e; width: 30px; height: 30px;"></label>
+                                <input type="radio" class="btn-check" name="cc-color" id="ccc_gold" value="gold" onclick="updateCCPreview()"><label class="btn rounded-circle" for="ccc_gold" style="background: #f7971e; width: 30px; height: 30px;"></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                    <button class="btn btn-dark w-100 rounded-pill" onclick="createCreditCard()">Crear Tarjeta</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteCardConfirmModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 pb-0">
+                    <h6 class="modal-title fw-bold text-danger">Eliminar Tarjeta</h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3">
+                        <div class="bg-danger bg-opacity-10 p-3 rounded-circle d-inline-flex text-danger">
+                            <i class="fas fa-exclamation-triangle fa-2x"></i>
+                        </div>
+                    </div>
+                    <p class="mb-1 text-dark fw-bold" id="del-confirm-card-name">...</p>
+                    <p class="small text-muted mb-0">Esta acción es permanente y no se puede deshacer. ¿Deseas continuar?</p>
+                    
+                    <input type="hidden" id="del-confirm-idx">
+                </div>
+                <div class="modal-footer border-top-0 pt-0 px-4 pb-4">
+                    <div class="row w-100 g-2">
+                        <div class="col-6">
+                            <button type="button" class="btn btn-light w-100 rounded-pill fw-bold" data-bs-dismiss="modal">Cancelar</button>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-danger w-100 rounded-pill fw-bold" onclick="executeCardDelete()">
+                                Sí, Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="cantDeleteModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3 text-warning">
+                        <i class="fas fa-hand-paper fa-3x"></i>
+                    </div>
+                    <h6 class="fw-bold mb-2">No se puede eliminar</h6>
+                    <p class="small text-muted mb-4" id="cant-delete-msg">...</p>
+                    <button type="button" class="btn btn-dark w-100 rounded-pill" data-bs-dismiss="modal">Entendido</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="configCardModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold">Configurar Fechas</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Define las fechas para que el sistema calcule cuándo mostrar saldo a favor o deuda.</p>
+                    
+                    <input type="hidden" id="cfg-card-index">
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">📅 Día de Corte Mensual</label>
+                        <input type="number" id="cfg-cut-day" class="form-control fw-bold" placeholder="Ej. 14" min="1" max="31">
+                        <div class="form-text small">Día que cierra tu estado de cuenta.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">⏳ Días para Pagar</label>
+                        <input type="number" id="cfg-pay-days" class="form-control fw-bold" placeholder="Ej. 20" value="20">
+                        <div class="form-text small">Días que da el banco después del corte (aprox 20).</div>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 px-3">
+                    <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm" onclick="saveCardConfig()">
+                        <i class="fas fa-save me-2"></i>Guardar Configuración
+                    </button>
+                </div>
             </div>
         </div>
     </div>
