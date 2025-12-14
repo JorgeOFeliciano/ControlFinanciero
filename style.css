@@ -661,6 +661,75 @@ body.privacy-active #total-income-display {
     text-shadow: 0 1px 3px rgba(0,0,0,0.5);
 }
 
+/* Estilo del Slider */
+.form-range::-webkit-slider-thumb {
+    background: #0d6efd; /* Color azul primario */
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+    transition: all 0.2s ease-in-out;
+}
+.form-range::-webkit-slider-thumb:active {
+    background: #0a58ca;
+    transform: scale(1.1);
+}
+.card-custom {
+    border-radius: 1rem; /* Bordes más redondeados para el widget */
+}
+
+/* --- CORRECCIÓN VISUAL DEL SLIDER --- */
+
+/* 1. Ajuste general del input */
+.form-range {
+    height: 10px; /* Altura del componente completo */
+    background: transparent; /* Fondo transparente para no tapar */
+    margin-top: 10px;
+    margin-bottom: 10px;
+    -webkit-appearance: none; /* Resetear estilos nativos */
+    appearance: none;
+}
+
+/* 2. Estilo de la BARRA (El camino gris) - Chrome/Safari/Edge */
+.form-range::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 8px; /* Grosor de la barra */
+    cursor: pointer;
+    background: #e9ecef; /* Color gris claro (Bootstrap default) */
+    border-radius: 5px; /* Bordes redondeados */
+    border: 1px solid #dee2e6; /* Un borde sutil para que se note más */
+}
+
+/* 3. Estilo de la BARRA - Firefox */
+.form-range::-moz-range-track {
+    width: 100%;
+    height: 8px;
+    cursor: pointer;
+    background: #e9ecef;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+/* 4. Asegurar que el botón (Thumb) esté centrado verticalmente */
+.form-range::-webkit-slider-thumb {
+    margin-top: -6px; /* Truco para centrar el círculo en la barra */
+    /* Mantener tus estilos anteriores del botón azul */
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: #0d6efd;
+    cursor: pointer;
+    -webkit-appearance: none;
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+}
+
+.form-range::-moz-range-thumb {
+    height: 20px;
+    width: 20px;
+    border: none;
+    border-radius: 50%;
+    background: #0d6efd;
+    cursor: pointer;
+    box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.2);
+}
+
 /* =========================================
    14. COLORES DE BANCOS (FALLBACK)
    ========================================= */

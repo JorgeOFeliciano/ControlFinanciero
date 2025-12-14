@@ -37,6 +37,10 @@
                     <input type="file" id="excelInput" hidden accept=".xlsx, .xls">
                 </label>
 
+                <button class="btn btn-sm btn-success w-100 fw-bold shadow-sm mt-2" onclick="downloadSmartTemplate()">
+                    <i class="fas fa-file-excel me-2"></i>Descargar Formato de Llenado
+                </button>
+
                 <div class="row g-2 mt-1">
                     <div class="col-6">
                         <button class="btn btn-sm sidebar-footer-btn w-100 py-2 rounded-3" onclick="togglePrivacy()" title="Ocultar Montos">
@@ -105,8 +109,9 @@
                             </div>
                         </div>
 
+
                         <div class="row g-4">
-                            <div class="col-lg-8">
+                            <div class="col-12">
                                 <div class="card card-custom p-4 h-100 border-0">
                                     <div class="d-flex justify-content-between align-items-center mb-4">
                                         <h5 class="fw-bold text-dark mb-0">
@@ -114,35 +119,130 @@
                                         </h5>
                                         <span class="badge bg-light text-dark border">Vista Actual</span>
                                     </div>
-                                    <div class="chart-container-wrapper">
+                                    <div class="chart-container-wrapper" style="height: 300px; position: relative;">
                                         <canvas id="mainChart"></canvas>
                                     </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div class="col-lg-4">
-                                <div class="dashboard-table-card p-0 overflow-hidden h-100">
-                                    <div class="p-4 border-bottom bg-light">
-                                        <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-bolt me-2 text-warning"></i>Estado Rápido</h6>
+                        <div class="row mt-4 mb-5">
+                            <div class="col-12">
+                                <div class="card card-custom border-0 shadow-sm overflow-hidden">
+                                    <div class="card-body p-0">
+                                        <div class="row g-0">
+                                            
+                                            <div class="col-md-4 p-4 bg-light border-end">
+                                                <h6 class="fw-bold text-primary mb-1"><i class="fas fa-history me-2"></i>Proyección de Pagos</h6>
+                                                <small class="text-muted d-block mb-4">Desliza para ver tus pagos futuros</small>
+                                                
+                                                <div class="text-center py-3">
+                                                    <h2 class="fw-bold text-dark mb-0" id="proj-month-label">---</h2>
+                                                    <small class="text-success fw-bold" id="proj-total-label">$0.00</small>
+                                                </div>
+
+                                                <div class="mt-4 px-2">
+                                                    <label class="small fw-bold text-muted mb-2 d-flex justify-content-between">
+                                                        <span>Hoy</span>
+                                                        <span id="proj-end-date">Fin de Deuda</span>
+                                                    </label>
+                                                    <input type="range" class="form-range" id="time-slider" min="0" max="0" value="0" step="1" oninput="renderProjectionStep(this.value)">
+                                                </div>
+                                                
+                                                <div class="mt-4 text-center">
+                                                    <small class="text-muted fst-italic" id="proj-freedom-msg">...</small>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-md-8 p-4">
+                                                <h6 class="fw-bold text-muted small border-bottom pb-2 mb-3">DESGLOSE POR TARJETA</h6>
+                                                
+                                                <div id="proj-details-list" style="height: 220px; overflow-y: auto;">
+                                                    <div class="text-center text-muted py-5 mt-3">
+                                                        <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                                        <p>Calculando futuro...</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                        </div>
                                     </div>
-                                    <div class="table-responsive flex-grow-1">
-                                        <table class="table table-dashboard w-100 mb-0">
-                                            <thead class="bg-white">
-                                                <tr>
-                                                    <th class="ps-4 text-muted small fw-bold">TARJETA</th>
-                                                    <th class="text-end text-muted small fw-bold">PAGO MES</th> 
-                                                    <th class="pe-4 text-end text-muted small fw-bold">TOTAL</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody id="dashboard-table"></tbody>
-                                            <tfoot class="bg-light">
-                                                <tr>
-                                                    <td class="ps-4 fw-bold text-dark">TOTAL:</td>
-                                                    <td class="text-end fw-bold text-danger" id="total-monthly-payment">$0.00</td>
-                                                    <td class="pe-4"></td>
-                                                </tr>
-                                            </tfoot>
-                                        </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mb-5">
+    
+                            <div class="col-lg-6">
+                                <div class="card card-custom h-100 border-0 shadow-sm">
+                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                        <h6 class="fw-bold text-dark mb-0">
+                                            <i class="fas fa-hand-holding-usd me-2 text-warning"></i>Cuentas por Cobrar
+                                        </h6>
+                                        <span class="badge bg-warning text-dark rounded-pill" id="widget-loans-count">0 Activos</span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-end mb-3">
+                                            <h2 class="fw-bold text-dark mb-0 me-2" id="widget-loans-total">$0.00</h2>
+                                            <small class="text-muted mb-1">pendientes de recuperación</small>
+                                        </div>
+                                        
+                                        <div id="widget-loans-list" style="max-height: 200px; overflow-y: auto;">
+                                            </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card card-custom h-100 border-0 shadow-sm">
+                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                        <h6 class="fw-bold text-dark mb-0">
+                                            <i class="fas fa-chart-line me-2 text-success"></i>Ingresos del Mes
+                                        </h6>
+                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill border border-success border-opacity-25" id="widget-income-month">...</span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="d-flex align-items-end mb-3">
+                                            <h2 class="fw-bold text-success mb-0 me-2" id="widget-income-total">$0.00</h2>
+                                            <small class="text-muted mb-1">acumulado este mes</small>
+                                        </div>
+
+                                        <div id="widget-income-list" style="max-height: 200px; overflow-y: auto;">
+                                            </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-4 mb-4">
+                            <div class="col-md-6">
+                                <div class="card card-custom h-100 border-0 shadow-sm">
+                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                        <h6 class="fw-bold text-dark mb-0">
+                                            <i class="fas fa-university me-2 text-primary"></i>Distribución en Cuentas
+                                        </h6>
+                                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill border border-primary border-opacity-25">Total: <span id="chart-total-debit">$0.00</span></span>
+                                    </div>
+                                    <div class="card-body position-relative">
+                                        <div class="chart-pie-wrapper" style="height: 250px; position: relative;">
+                                            <canvas id="debitPieChart"></canvas>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card card-custom h-100 border-0 shadow-sm">
+                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
+                                        <h6 class="fw-bold text-dark mb-0">
+                                            <i class="fas fa-coins me-2 text-success"></i>Distribución de Efectivo
+                                        </h6>
+                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill border border-success border-opacity-25">Total: <span id="chart-total-assets">$0.00</span></span>
+                                    </div>
+                                    <div class="card-body position-relative">
+                                        <div class="chart-pie-wrapper" style="height: 250px; position: relative;">
+                                            <canvas id="assetPieChart"></canvas>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -399,7 +499,7 @@
                     <input type="hidden" id="pay-idx">
                 </div>
                 <div class="modal-footer border-top-0">
-                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="submitPayCard()">Confirmar Pago</button>
+                    <button type="button" class="btn btn-success w-100 rounded-pill" onclick="submitPay()">Confirmar Pago</button>
                 </div>
             </div>
         </div>
@@ -541,17 +641,103 @@
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 <div class="modal-header border-bottom-0 text-white" id="edit-modal-header" style="background: #333;">
-                    <div><h6 class="modal-title fw-bold mb-0"><i class="fas fa-cog me-2"></i>Gestionar Cuenta</h6><small class="opacity-75" style="font-size: 0.75rem;">Edición y Opciones</small></div>
+                    <div>
+                        <h6 class="modal-title fw-bold mb-0"><i class="fas fa-cog me-2"></i>Gestionar Cuenta</h6>
+                        <small class="opacity-75" style="font-size: 0.75rem;">Edición y Opciones</small>
+                    </div>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
+
                 <div class="modal-body p-4">
-                    <label class="small text-muted fw-bold mb-1">Nombre</label><div class="input-group mb-3"><span class="input-group-text bg-light border-end-0"><i class="fas fa-signature text-muted"></i></span><input type="text" id="edit-name" class="form-control fw-bold border-start-0"></div>
-                    <label class="small text-muted fw-bold mb-1">Saldo Total</label><div class="input-group mb-4"><span class="input-group-text bg-light border-end-0"><i class="fas fa-dollar-sign text-muted"></i></span><input type="number" id="edit-amount" class="form-control fw-bold fs-5 border-start-0"></div>
-                    <div id="quick-actions-block"><h6 class="border-bottom pb-2 mb-3 small fw-bold text-primary">OPERACIONES RÁPIDAS</h6><div class="row g-2 mb-3"><div class="col-6"><button class="btn btn-outline-danger w-100 btn-sm" onclick="showQuickInput('-')"><i class="fas fa-minus me-1"></i>Retirar</button></div><div class="col-6"><button class="btn btn-outline-success w-100 btn-sm" onclick="showQuickInput('+')"><i class="fas fa-plus me-1"></i>Ingresar</button></div></div><div id="quick-input-container" class="bg-light p-3 rounded-3 border d-none fade-in-down mb-4"><div class="d-flex justify-content-between align-items-center mb-2"><label class="small fw-bold mb-0 text-dark">Detalles del movimiento:</label><button type="button" class="btn-close small" onclick="hideQuickInput()" aria-label="Cerrar"></button></div><select id="quick-context-select" class="form-select form-select-sm mb-2 shadow-sm fw-bold text-secondary"></select><div class="input-group"><input type="number" id="quick-amount-val" class="form-control fw-bold" placeholder="0.00"><button class="btn btn-dark fw-bold" id="quick-apply-btn" onclick="applyQuickInput()">Aplicar</button></div></div></div>
-                    <div class="mt-auto pt-2 border-top"><button class="btn btn-link text-danger text-decoration-none btn-sm w-100 mt-2" onclick="deleteFromEdit()"><i class="fas fa-trash-alt me-2"></i>Eliminar esta cuenta permanentemente</button></div>
-                    <input type="hidden" id="edit-type"><input type="hidden" id="edit-idx">
+                    <label class="small text-muted fw-bold mb-1">Nombre</label>
+                    <div class="input-group mb-3">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-signature text-muted"></i></span>
+                        <input type="text" id="edit-name" class="form-control fw-bold border-start-0">
+                    </div>
+
+                    <div id="edit-color-block" class="mb-3 d-none">
+                        <label class="small text-muted fw-bold mb-2">Apariencia de la Tarjeta</label>
+                        <div class="d-flex flex-wrap gap-2">
+                            <style>
+                                .edit-color-radio { display: none; }
+                                .edit-color-label { 
+                                    width: 30px; height: 30px; border-radius: 50%; cursor: pointer; 
+                                    border: 2px solid transparent; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                                }
+                                .edit-color-radio:checked + .edit-color-label { 
+                                    transform: scale(1.2); border-color: #333; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+                                }
+                            </style>
+
+                            <input type="radio" name="edit-color" value="brand_nu" id="ec_nu" class="edit-color-radio">
+                            <label for="ec_nu" class="edit-color-label" title="Nu" style="background: linear-gradient(135deg, #82269e, #5d1875);"></label>
+
+                            <input type="radio" name="edit-color" value="brand_bbva" id="ec_bbva" class="edit-color-radio">
+                            <label for="ec_bbva" class="edit-color-label" title="BBVA" style="background: linear-gradient(135deg, #004481, #1a2d52);"></label>
+
+                            <input type="radio" name="edit-color" value="brand_mercado" id="ec_mp" class="edit-color-radio">
+                            <label for="ec_mp" class="edit-color-label" title="MercadoPago" style="background: linear-gradient(135deg, #009ee3, #007eb5);"></label>
+                            
+                            <input type="radio" name="edit-color" value="brand_santander" id="ec_sant" class="edit-color-radio">
+                            <label for="ec_sant" class="edit-color-label" title="Santander" style="background: linear-gradient(135deg, #ec0000, #b30000);"></label>
+
+                            <input type="radio" name="edit-color" value="brand_cashi" id="ec_cashi" class="edit-color-radio">
+                            <label for="ec_cashi" class="edit-color-label" title="Cashi" style="background: linear-gradient(135deg, #ff005e, #d6004f);"></label>
+
+                            <input type="radio" name="edit-color" value="blue" id="ec_blue" class="edit-color-radio">
+                            <label for="ec_blue" class="edit-color-label" title="Azul" style="background: linear-gradient(135deg, #00b4db, #0083b0);"></label>
+
+                            <input type="radio" name="edit-color" value="dark" id="ec_dark" class="edit-color-radio">
+                            <label for="ec_dark" class="edit-color-label" title="Negro" style="background: linear-gradient(135deg, #232526, #414345);"></label>
+                            
+                            <input type="radio" name="edit-color" value="green" id="ec_green" class="edit-color-radio">
+                            <label for="ec_green" class="edit-color-label" title="Verde" style="background: linear-gradient(135deg, #0f9b0f, #005c00);"></label>
+
+                            <input type="radio" name="edit-color" value="gold" id="ec_gold" class="edit-color-radio">
+                            <label for="ec_gold" class="edit-color-label" title="Dorado" style="background: linear-gradient(135deg, #f7971e, #ffd200);"></label>
+                        </div>
+                    </div>
+
+                    <label class="small text-muted fw-bold mb-1">Saldo Total</label>
+                    <div class="input-group mb-4">
+                        <span class="input-group-text bg-light border-end-0"><i class="fas fa-dollar-sign text-muted"></i></span>
+                        <input type="number" id="edit-amount" class="form-control fw-bold fs-5 border-start-0">
+                    </div>
+
+                    <div id="quick-actions-block">
+                        <h6 class="border-bottom pb-2 mb-3 small fw-bold text-primary">OPERACIONES RÁPIDAS</h6>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6"><button class="btn btn-outline-danger w-100 btn-sm" onclick="showQuickInput('-')"><i class="fas fa-minus me-1"></i>Retirar</button></div>
+                            <div class="col-6"><button class="btn btn-outline-success w-100 btn-sm" onclick="showQuickInput('+')"><i class="fas fa-plus me-1"></i>Ingresar</button></div>
+                        </div>
+                        <div id="quick-input-container" class="bg-light p-3 rounded-3 border d-none fade-in-down mb-4">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="small fw-bold mb-0 text-dark">Detalles del movimiento:</label>
+                                <button type="button" class="btn-close small" onclick="hideQuickInput()" aria-label="Cerrar"></button>
+                            </div>
+                            <select id="quick-context-select" class="form-select form-select-sm mb-2 shadow-sm fw-bold text-secondary"></select>
+                            <div class="input-group">
+                                <input type="number" id="quick-amount-val" class="form-control fw-bold" placeholder="0.00">
+                                <button class="btn btn-dark fw-bold" id="quick-apply-btn" onclick="applyQuickInput()">Aplicar</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-auto pt-2 border-top">
+                        <button class="btn btn-link text-danger text-decoration-none btn-sm w-100 mt-2" onclick="deleteFromEdit()">
+                            <i class="fas fa-trash-alt me-2"></i>Eliminar esta cuenta permanentemente
+                        </button>
+                    </div>
+
+                    <input type="hidden" id="edit-type">
+                    <input type="hidden" id="edit-idx">
                 </div>
-                <div class="modal-footer border-top-0 pt-0 pb-4 px-4"><button type="button" class="btn btn-dark w-100 rounded-pill fw-bold shadow-sm py-2" onclick="saveEdit()"><i class="fas fa-check-circle me-2"></i>Guardar Todo</button></div>
+
+                <div class="modal-footer border-top-0 pt-0 pb-4 px-4">
+                    <button type="button" class="btn btn-dark w-100 rounded-pill fw-bold shadow-sm py-2" onclick="saveEdit()">
+                        <i class="fas fa-check-circle me-2"></i>Guardar Todo
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -750,33 +936,138 @@
     </div>
 
     <div class="modal fade" id="configCardModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0 shadow">
                 <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">Configurar Fechas</h5>
+                    <h5 class="modal-title fw-bold">Configuración de Tarjeta</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Define las fechas para que el sistema calcule cuándo mostrar saldo a favor o deuda.</p>
+                    <p class="text-muted small mb-3">Ajusta las fechas de corte o cambia la apariencia de la tarjeta.</p>
                     
                     <input type="hidden" id="cfg-card-index">
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">📅 Día de Corte Mensual</label>
-                        <input type="number" id="cfg-cut-day" class="form-control fw-bold" placeholder="Ej. 14" min="1" max="31">
-                        <div class="form-text small">Día que cierra tu estado de cuenta.</div>
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">📅 Día Corte</label>
+                            <input type="number" id="cfg-cut-day" class="form-control fw-bold text-center" placeholder="Ej. 14">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">⏳ Días Pago</label>
+                            <input type="number" id="cfg-pay-days" class="form-control fw-bold text-center" placeholder="Ej. 20">
+                        </div>
+                        <div class="col-12"><div class="form-text small text-center">Día de cierre y días límite para pagar.</div></div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">⏳ Días para Pagar</label>
-                        <input type="number" id="cfg-pay-days" class="form-control fw-bold" placeholder="Ej. 20" value="20">
-                        <div class="form-text small">Días que da el banco después del corte (aprox 20).</div>
+                    <hr class="opacity-10 my-3">
+
+                    <label class="form-label small fw-bold text-muted mb-2 d-block text-center">🎨 Apariencia Manual</label>
+                    
+                    <div class="d-flex flex-wrap justify-content-center gap-2 mb-3" id="cfg-color-container">
+                        <style>
+                            .color-radio { display: none; }
+                            .color-label { 
+                                width: 35px; height: 35px; border-radius: 50%; cursor: pointer; 
+                                border: 2px solid transparent; transition: transform 0.2s;
+                                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                            }
+                            .color-radio:checked + .color-label { 
+                                transform: scale(1.2); border-color: #333; box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+                            }
+                        </style>
+
+                        <input type="radio" name="cfg-color" value="brand_nu" id="cc_nu" class="color-radio">
+                        <label for="cc_nu" class="color-label" title="Nu (Morado)" style="background: linear-gradient(135deg, #82269e, #5d1875);"></label>
+
+                        <input type="radio" name="cfg-color" value="brand_bbva" id="cc_bbva" class="color-radio">
+                        <label for="cc_bbva" class="color-label" title="BBVA (Azul)" style="background: linear-gradient(135deg, #004481, #1a2d52);"></label>
+
+                        <input type="radio" name="cfg-color" value="brand_mercado" id="cc_mp" class="color-radio">
+                        <label for="cc_mp" class="color-label" title="MercadoPago" style="background: linear-gradient(135deg, #009ee3, #007eb5);"></label>
+
+                        <input type="radio" name="cfg-color" value="brand_santander" id="cc_sant" class="color-radio">
+                        <label for="cc_sant" class="color-label" title="Santander" style="background: linear-gradient(135deg, #ec0000, #b30000);"></label>
+
+                        <input type="radio" name="cfg-color" value="brand_cashi" id="cc_cashi" class="color-radio">
+                        <label for="cc_cashi" class="color-label" title="Cashi" style="background: linear-gradient(135deg, #ff005e, #d6004f);"></label>
+                        
+                        <input type="radio" name="cfg-color" value="brand_uala" id="cc_uala" class="color-radio">
+                        <label for="cc_uala" class="color-label" title="Ualá" style="background: linear-gradient(135deg, #ff5e5e, #e04545);"></label>
+
+                        <input type="radio" name="cfg-color" value="brand_stori" id="cc_stori" class="color-radio">
+                        <label for="cc_stori" class="color-label" title="Stori" style="background: linear-gradient(135deg, #00a5a3, #007a79);"></label>
+                        
+                        <div class="w-100"></div> <input type="radio" name="cfg-color" value="blue" id="cc_blue" class="color-radio">
+                        <label for="cc_blue" class="color-label" title="Azul" style="background: linear-gradient(135deg, #00b4db, #0083b0);"></label>
+
+                        <input type="radio" name="cfg-color" value="dark" id="cc_dark" class="color-radio">
+                        <label for="cc_dark" class="color-label" title="Negro" style="background: linear-gradient(135deg, #232526, #414345);"></label>
+
+                        <input type="radio" name="cfg-color" value="gold" id="cc_gold" class="color-radio">
+                        <label for="cc_gold" class="color-label" title="Dorado" style="background: linear-gradient(135deg, #f7971e, #ffd200);"></label>
+                        
+                        <input type="radio" name="cfg-color" value="purple" id="cc_purple" class="color-radio">
+                        <label for="cc_purple" class="color-label" title="Morado" style="background: linear-gradient(135deg, #82269e, #a450c0);"></label>
+
+                        <input type="radio" name="cfg-color" value="green" id="cc_green" class="color-radio">
+                        <label for="cc_green" class="color-label" title="Verde" style="background: linear-gradient(135deg, #0f9b0f, #005c00);"></label>
                     </div>
+
                 </div>
                 <div class="modal-footer border-0 pt-0 pb-4 px-3">
                     <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold shadow-sm" onclick="saveCardConfig()">
-                        <i class="fas fa-save me-2"></i>Guardar Configuración
+                        <i class="fas fa-save me-2"></i>Aplicar Cambios
                     </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="projectionModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header border-bottom-0 bg-dark text-white">
+                    <div>
+                        <h6 class="modal-title fw-bold"><i class="fas fa-calendar-alt me-2"></i>Proyección Detallada</h6>
+                        <small class="opacity-75">Desglose de pagos futuros por tarjeta</small>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered mb-0 align-middle" style="font-size: 0.9rem;">
+                            <thead class="bg-light sticky-top">
+                                <tr class="text-center text-muted text-uppercase small">
+                                    <th class="py-3 bg-white" style="width: 15%;">Mes</th>
+                                    <th class="py-3 bg-white text-start ps-3">Desglose por Tarjeta</th>
+                                    <th class="py-3 bg-white" style="width: 20%;">Total Mes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="projection-body">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer border-top-0 justify-content-center py-3 bg-light">
+                    <small class="text-muted text-center" id="freedom-date-msg">...</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="loanPaidModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-body text-center p-4">
+                    <div class="mb-3 text-success">
+                        <i class="fas fa-check-circle fa-4x"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2">¡Cobro Completado!</h5>
+                    <p class="text-muted small mb-0">Has recuperado todo el dinero de <strong id="loan-paid-name" class="text-dark">...</strong>.</p>
+                    <div class="alert alert-light border small mt-3 mb-0 text-muted">
+                        <i class="fas fa-trash-alt me-1"></i> El registro se ha eliminado de la lista.
+                    </div>
+                    <button type="button" class="btn btn-success w-100 rounded-pill mt-3 fw-bold shadow-sm" data-bs-dismiss="modal">Excelente</button>
                 </div>
             </div>
         </div>
