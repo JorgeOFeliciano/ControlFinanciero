@@ -1089,25 +1089,133 @@ function saveNewSource() {
 }
 function deleteSource(idx, e) { e.preventDefault(); e.stopPropagation(); if(appData.incomeSources.length>1 && confirm('Borrar fuente?')) { appData.incomeSources.splice(idx, 1); saveData(); renderIncomeOptions(appData.incomeSources[0].id); }}
 
-// --- DETALLE TARJETA Y SELECTOR ---
-function updateSelectors() { 
-    const s = document.getElementById('card-selector'); 
-    if (s.options.length !== appData.cards.length) { 
-        const v = s.value; s.innerHTML = ''; const cOpt = document.getElementById('custom-select-options'); cOpt.innerHTML = ''; 
-        appData.cards.forEach((c, i) => { 
-            let o = document.createElement('option'); o.value = i; o.text = c.name; s.add(o); 
-            let co = document.createElement('span'); co.className = 'custom-option'; 
-            if (i == (v || 0)) co.classList.add('selected'); 
-            let ic = '<i class="fas fa-credit-card me-2 opacity-50"></i>'; 
-            if (c.name.toLowerCase().includes('nu')) ic = '<i class="fas fa-cube me-2 text-primary"></i>'; 
-            co.innerHTML = `${ic} ${c.name}`; 
-            co.addEventListener('click', function () { s.value = i; document.getElementById('custom-select-text').innerHTML = this.innerHTML; document.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected')); this.classList.add('selected'); document.getElementById('custom-card-select').classList.remove('open'); renderCardDetail(i) }); 
-            cOpt.appendChild(co) 
-        }); 
-        s.value = v || 0; 
-        if (appData.cards.length > 0) renderCardDetail(s.value); 
-    } 
+// --- MAPEO DE LOGOS ONLINE (URLs Públicas) ---
+function getBankLogoUrl(name) {
+    const n = name.toLowerCase();
+    let domain = '';
+
+    // Asignamos el dominio web real de cada banco
+    // Usamos dominios oficiales para que Google encuentre el logo exacto
+    if (n.includes('nu')) domain = 'nu.com.mx';
+    else if (n.includes('bbva')) domain = 'bbva.mx';
+    else if (n.includes('santander')) domain = 'santander.com.mx';
+    else if (n.includes('mercado')) domain = 'mercadopago.com.mx';
+    else if (n.includes('banamex')) domain = 'banamex.com';
+    else if (n.includes('hsbc')) domain = 'hsbc.com.mx';
+    else if (n.includes('scotia')) domain = 'scotiabank.com.mx';
+    else if (n.includes('liverpool')) domain = 'liverpool.com.mx';
+    else if (n.includes('coppel')) domain = 'coppel.com';
+    else if (n.includes('azteca')) domain = 'bancoazteca.com.mx';
+    else if (n.includes('amex') || n.includes('american')) domain = 'americanexpress.com';
+    else if (n.includes('rappi')) domain = 'rappicard.mx';
+    else if (n.includes('didi')) domain = 'didi-food.com';
+    else if (n.includes('uala')) domain = 'uala.mx';
+    else if (n.includes('stori')) domain = 'storicard.com';
+    else if (n.includes('klar')) domain = 'klar.mx';
+    else if (n.includes('hey')) domain = 'heybanco.com';
+    else if (n.includes('cashi')) domain = 'cashi.com.mx';
+    else if (n.includes('plata')) domain = 'platacard.mx'; // <--- AGREGADO PLATA
+
+    // Si encontramos un dominio, pedimos el logo a Google (No se bloquea)
+    if (domain) {
+        return `https://www.google.com/s2/favicons?domain=${domain}&sz=64`;
+    }
+    
+    return null;
 }
+
+function updateSelectors() {
+    const s = document.getElementById('card-selector');
+    const cOpt = document.getElementById('custom-select-options');
+    const currentVal = s.value; 
+
+    s.innerHTML = '';
+    cOpt.innerHTML = '';
+
+    appData.cards.forEach((c, i) => {
+        // 1. Select Oculto
+        let o = document.createElement('option');
+        o.value = i;
+        o.text = c.name;
+        s.add(o);
+
+        // 2. PREPARAR EL ÍCONO OFFLINE (BACKUP)
+        // Se usa si falla la carga de la imagen de Google
+        let iconClass = 'fa-credit-card'; 
+        let iconColor = '#6c757d';
+        const n = c.name.toLowerCase();
+
+        if (n.includes('nu')) { iconClass = 'fa-cube'; iconColor = '#82269e'; }
+        else if (n.includes('bbva')) { iconClass = 'fa-university'; iconColor = '#004481'; }
+        else if (n.includes('mercado')) { iconClass = 'fa-handshake'; iconColor = '#009ee3'; }
+        else if (n.includes('santander')) { iconClass = 'fa-fire'; iconColor = '#ec0000'; }
+        else if (n.includes('coppel')) { iconClass = 'fa-key'; iconColor = '#f7971e'; }
+        else if (n.includes('cashi')) { iconClass = 'fa-mobile-alt'; iconColor = '#ff005e'; }
+        else if (n.includes('azteca')) { iconClass = 'fa-leaf'; iconColor = '#27ae60'; }
+        else if (n.includes('amex')) { iconClass = 'fa-globe-americas'; iconColor = '#2c3e50'; }
+        else if (n.includes('liverpool')) { iconClass = 'fa-shopping-bag'; iconColor = '#e0006c'; }
+        else if (n.includes('plata')) { iconClass = 'fa-layer-group'; iconColor = '#bdc3c7'; } // <--- AGREGADO PLATA (Gris)
+
+        // HTML del ícono de respaldo
+        const backupIconHTML = `<i class="fas ${iconClass} me-2" style="color: ${iconColor}; font-size: 1.1rem; width: 24px; text-align: center;"></i>`;
+
+        // 3. INTENTAR OBTENER URL ONLINE
+        const logoUrl = getBankLogoUrl(c.name);
+
+        // 4. CREAR LA OPCIÓN VISUAL
+        let co = document.createElement('span');
+        co.className = 'custom-option';
+        if (i == (currentVal || 0)) co.classList.add('selected');
+
+        // Lógica Híbrida: Imagen con error handler
+        if (logoUrl) {
+            // Si la imagen de Google falla, se reemplaza por el ícono de FontAwesome
+            co.innerHTML = `
+                <img src="${logoUrl}" 
+                     alt="icon" 
+                     class="me-2 rounded-circle" 
+                     style="width: 24px; height: 24px; object-fit: contain; background: white;"
+                     onerror="this.outerHTML='${backupIconHTML.replace(/"/g, "'")}'">
+                ${c.name}
+            `;
+        } else {
+            // Si no hay URL, usa directo el ícono
+            co.innerHTML = `${backupIconHTML} ${c.name}`;
+        }
+
+        // 5. Evento Click
+        co.addEventListener('click', function () {
+            s.value = i;
+            
+            // Copiar el contenido visual al selector principal
+            const mainText = document.getElementById('custom-select-text');
+            mainText.innerHTML = this.innerHTML;
+            
+            document.querySelectorAll('.custom-option').forEach(el => el.classList.remove('selected'));
+            this.classList.add('selected');
+            document.getElementById('custom-card-select').classList.remove('open');
+            renderCardDetail(i);
+        });
+        
+        cOpt.appendChild(co);
+    });
+
+    // Inicializar visualización
+    s.value = currentVal || 0;
+    if (appData.cards.length > 0) {
+        const idx = s.value;
+        const ops = cOpt.querySelectorAll('.custom-option');
+        if (ops[idx]) {
+            document.getElementById('custom-select-text').innerHTML = ops[idx].innerHTML;
+            ops[idx].classList.add('selected');
+        }
+        renderCardDetail(s.value);
+    } else {
+        document.getElementById('custom-select-text').innerHTML = 'Sin tarjetas';
+    }
+}
+
+
 document.querySelector('.custom-select-trigger').addEventListener('click', function () { document.getElementById('custom-card-select').classList.toggle('open') }); 
 window.addEventListener('click', function (e) { const s = document.getElementById('custom-card-select'); if (!s.contains(e.target)) s.classList.remove('open') });
 
@@ -1487,6 +1595,58 @@ function renderIncomesWidget() {
     });
     document.getElementById('widget-income-total').innerText = fmt(monthTotal);
 }
+
+// --- LÓGICA DE COBRANZA (PRÉSTAMOS) ---
+
+// 1. Función para ABRIR el modal (Se llama desde el botón de la lista)
+function openPayModal(index, name) {
+    // A. Llenamos los textos del modal con la info del deudor
+    document.getElementById('pay-label').innerText = `Abonar a: ${name}`;
+    document.getElementById('pay-idx').value = index; // Guardamos el índice oculto
+    document.getElementById('pay-amount').value = ''; // Limpiamos el campo de monto
+
+    // B. Abrimos el modal usando Bootstrap
+    const modalElement = document.getElementById('payModal');
+    const myModal = new bootstrap.Modal(modalElement);
+    myModal.show();
+    
+    // C. Ponemos el cursor en el input para escribir rápido
+    setTimeout(() => document.getElementById('pay-amount').focus(), 500);
+}
+
+// 2. Función para GUARDAR el abono (Se llama desde el botón "Confirmar Pago")
+function submitPay() {
+    const index = document.getElementById('pay-idx').value;
+    const amount = parseFloat(document.getElementById('pay-amount').value);
+
+    // Validamos que el monto sea real
+    if (amount > 0 && appData.loans[index]) {
+        
+        // A. Sumamos el dinero a lo "pagado"
+        appData.loans[index].paid += amount;
+
+        // B. Verificamos si ya terminó de pagar (Opcional: Muestra modal de éxito)
+        if (appData.loans[index].paid >= appData.loans[index].original) {
+            // Si quieres borrarlo automáticamente o mostrar aviso
+            // Por ahora solo actualizamos
+        }
+
+        // C. Guardamos y actualizamos la pantalla
+        saveData();
+        updateUI();
+
+        // D. Cerramos el modal
+        const modalElement = document.getElementById('payModal');
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        modalInstance.hide();
+
+        if (typeof showToast === 'function') showToast("✅ Abono registrado correctamente");
+
+    } else {
+        alert("Por favor ingresa un monto mayor a 0");
+    }
+}
+
 // --- WIDGETS DE GRÁFICAS DE PASTEL (LIQUIDEZ) ---
 // ACTUALIZADO: Gráficas centradas y más grandes
 
