@@ -740,3 +740,62 @@ body.privacy-active #total-income-display {
 .bg-cashi { background: linear-gradient(135deg, #ff005e 0%, #ff5e9a 100%); }
 .bg-uala { background: linear-gradient(135deg, #ff3333 0%, #ff6b6b 100%); }
 .bg-default { background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%); }
+
+/* =========================================
+   15. RESPONSIVIDAD TOTAL
+   ========================================= */
+
+/* Tablets y Laptops Pequeñas (< 992px) */
+@media (max-width: 991.98px) {
+    .sidebar { width: 240px; }
+    .main-content { margin-left: 240px; width: calc(100% - 240px); }
+    .income-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Teléfonos (Android / iPhone < 768px) */
+@media (max-width: 767.98px) {
+    .sidebar {
+        transform: translateX(-100%); /* Ocultar sidebar */
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1100;
+    }
+    .sidebar.active { transform: translateX(0); } /* Mostrar al activar */
+
+    .main-content { 
+        margin-left: 0; 
+        width: 100%; 
+        padding: 70px 15px 20px 15px; /* Espacio para el botón superior */
+    }
+
+    /* Botón flotante de menú */
+    .mobile-nav-toggle {
+        display: flex; position: fixed; top: 15px; left: 15px; z-index: 1200;
+        background: #0d6efd; color: white; border: none; border-radius: 8px;
+        width: 45px; height: 45px; align-items: center; justify-content: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .sidebar-overlay {
+        display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); z-index: 1050;
+    }
+    .sidebar-overlay.active { display: block; }
+
+    /* Tablas con scroll táctil */
+    .table-responsive-custom {
+        overflow-x: auto; -webkit-overflow-scrolling: touch; margin-bottom: 1rem;
+    }
+
+    /* Ajustar KPI Cards para que quepan de 2 en 2 */
+    .kpi-card { padding: 12px; margin-bottom: 0; }
+    .money-display { font-size: 1.1rem; }
+    
+    /* Calendario más pequeño */
+    .calendar-day { font-size: 0.7rem; aspect-ratio: 1; }
+}
+
+/* Notch de iPhone y áreas seguras */
+@supports (padding: env(safe-area-inset-top)) {
+    .sidebar { padding-top: calc(25px + env(safe-area-inset-top)); }
+    .main-content { padding-top: calc(70px + env(safe-area-inset-top)); }
+}

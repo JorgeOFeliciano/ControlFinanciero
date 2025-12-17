@@ -65,6 +65,28 @@ const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency:
 
 // --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
+    const menuToggle = document.getElementById('menuToggle');
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    function toggleMenu() {
+        sidebar.classList.toggle('active');
+        overlay.classList.toggle('active');
+    }
+
+    if(menuToggle) menuToggle.addEventListener('click', toggleMenu);
+    if(overlay) overlay.addEventListener('click', toggleMenu);
+
+    // Cerrar menú automáticamente al cambiar de pestaña en móvil
+    navLinks.forEach(link => {
+        link.addEventListener('click', () => {
+            if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
+                toggleMenu();
+            }
+        });
+    });
+
     // 1. Préstamos
     const loanBody = document.getElementById('loans-body');
     if (loanBody) {
@@ -492,7 +514,7 @@ function updateUI() {
     });
     
     // Botón de agregar nueva tarjeta
-    dGrid.innerHTML += `<div class="col-12 col-sm-6 col-lg-4 col-xl-3"><div class="mini-card mini-card-add h-100" onclick="openDebitModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
+    dGrid.innerHTML += `<div class="col-12 col-sm-6 col-lg-4 col-xl-3"><div class="mini-card mini-card-add h-100" onclick="openDepositModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
     // 4. Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
     if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><i class="fas fa-lock text-muted"></i></td></tr>`;
@@ -1079,6 +1101,7 @@ function updateSourcePreview() {
     box.style.background = c; box.style.color = 'white';
     document.getElementById('source-preview-text').innerText = n;
 }
+
 function saveNewSource() {
     const n = document.getElementById('new-source-name').value.trim();
     if(n){ 
@@ -1087,6 +1110,7 @@ function saveNewSource() {
         dateClick(document.getElementById('cal-modal-date').value);
     }
 }
+
 function deleteSource(idx, e) { e.preventDefault(); e.stopPropagation(); if(appData.incomeSources.length>1 && confirm('Borrar fuente?')) { appData.incomeSources.splice(idx, 1); saveData(); renderIncomeOptions(appData.incomeSources[0].id); }}
 
 // --- MAPEO DE LOGOS ONLINE (URLs Públicas) ---
@@ -1214,7 +1238,6 @@ function updateSelectors() {
         document.getElementById('custom-select-text').innerHTML = 'Sin tarjetas';
     }
 }
-
 
 document.querySelector('.custom-select-trigger').addEventListener('click', function () { document.getElementById('custom-card-select').classList.toggle('open') }); 
 window.addEventListener('click', function (e) { const s = document.getElementById('custom-card-select'); if (!s.contains(e.target)) s.classList.remove('open') });
@@ -1413,6 +1436,7 @@ function processCardPayment() {
 }
 
 function openPurchaseModal() { document.getElementById('new-purch-desc').value=''; document.getElementById('new-purch-amount').value=''; new bootstrap.Modal(document.getElementById('addPurchaseModal')).show(); }
+
 function savePurchase() {
     const idx = document.getElementById('card-selector').value;
     const d = document.getElementById('new-purch-desc').value;
@@ -1422,6 +1446,7 @@ function savePurchase() {
 }
 
 function delTransaction(ix) { document.getElementById('del-trans-index').value = ix; new bootstrap.Modal(document.getElementById('deleteTransModal')).show(); }
+
 function confirmDeleteTransaction() {
     const cIdx = document.getElementById('card-selector').value;
     const tIdx = document.getElementById('del-trans-index').value;
@@ -1430,8 +1455,85 @@ function confirmDeleteTransaction() {
     bootstrap.Modal.getInstance(document.getElementById('deleteTransModal')).hide();
 }
 
+// Inicializar el modal
+const depositModal = new bootstrap.Modal(document.getElementById('depositModal'));
+
+function openDepositModal() {
+    const sourceSelect = document.getElementById('dep-source-asset');
+    const targetSelect = document.getElementById('dep-target-account');
+    const amountInput = document.getElementById('dep-amount');
+
+    // Limpiar selectores
+    sourceSelect.innerHTML = '<option value="">-- Seleccionar Efectivo --</option>';
+    targetSelect.innerHTML = '<option value="">-- Seleccionar Tarjeta --</option>';
+    amountInput.value = '';
+
+    // 1. Llenar ORIGEN con appData.assets (Tus efectivos)
+    appData.assets.forEach((asset, index) => {
+        const option = document.createElement('option');
+        option.value = index; // Usamos el índice del arreglo
+        option.textContent = `💵 ${asset.name} (${fmt(asset.amount)})`;
+        sourceSelect.appendChild(option);
+    });
+
+    // 2. Llenar DESTINO con appData.debit (Tus tarjetas de débito)
+    appData.debit.forEach((card, index) => {
+        const option = document.createElement('option');
+        option.value = index;
+        option.textContent = `💳 ${card.name} (${fmt(card.balance)})`;
+        targetSelect.appendChild(option);
+    });
+
+    // 3. Abrir el modal de Bootstrap
+    const modalElement = document.getElementById('depositModal');
+    const modalInstance = bootstrap.Modal.getOrCreateInstance(modalElement);
+    modalInstance.show();
+}
+
+function processDeposit() {
+    const sourceIdx = document.getElementById('dep-source-asset').value;
+    const targetIdx = document.getElementById('dep-target-account').value;
+    const amount = parseFloat(document.getElementById('dep-amount').value);
+
+    // Validaciones
+    if (sourceIdx === "" || targetIdx === "") {
+        showToast("Por favor selecciona origen y destino", "danger");
+        return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+        showToast("Ingresa un monto válido", "danger");
+        return;
+    }
+
+    const source = appData.assets[sourceIdx];
+    const target = appData.debit[targetIdx];
+
+    // Verificar si hay saldo suficiente en efectivo
+    if (amount > source.amount) {
+        showToast(`Saldo insuficiente en ${source.name}`, "danger");
+        return;
+    }
+
+    // EJECUTAR MOVIMIENTO
+    source.amount -= amount;    // Restar de efectivo
+    target.balance += amount;   // Sumar a tarjeta de débito
+
+    // Registrar en el historial (usando tu sistema de logs)
+    addLog('deposito', `Depósito: ${source.name} 📥 ${target.name}`, amount);
+
+    // Guardar y Refrescar
+    saveData();
+    updateUI();
+
+    // Cerrar Modal
+    const modalInstance = bootstrap.Modal.getInstance(document.getElementById('depositModal'));
+    modalInstance.hide();
+
+    showToast(`✅ Depósito de ${fmt(amount)} realizado con éxito`);
+}
 // --- CREAR CRÉDITO MANUAL ---
 function openCreditModal() { document.getElementById('new-cc-name').value=''; document.getElementById('new-cc-limit').value=''; updateCCPreview(); new bootstrap.Modal(document.getElementById('addCreditModal')).show(); }
+
 function updateCCPreview() {
     const n = document.getElementById('new-cc-name').value || 'NOMBRE';
     const l = document.getElementById('new-cc-limit').value || 0;
@@ -1439,6 +1541,7 @@ function updateCCPreview() {
     document.getElementById('prev-cc-name').innerText = n; document.getElementById('prev-cc-limit').innerText = fmt(parseFloat(l));
     document.getElementById('new-credit-preview-box').style.background = c==='purple'?'#82269e':c==='blue'?'#00b4db':c==='gold'?'#f7971e':'#333';
 }
+
 function createCreditCard() {
     const n = document.getElementById('new-cc-name').value;
     const l = parseFloat(document.getElementById('new-cc-limit').value);
@@ -1447,6 +1550,7 @@ function createCreditCard() {
         saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('addCreditModal')).hide();
     }
 }
+
 function deleteCurrentCreditCard() { document.getElementById('del-confirm-idx').value = document.getElementById('card-selector').value; new bootstrap.Modal(document.getElementById('deleteCardConfirmModal')).show(); }
 function executeCardDelete() { appData.cards.splice(document.getElementById('del-confirm-idx').value, 1); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('deleteCardConfirmModal')).hide(); document.getElementById('credit-card-detail-panel').classList.add('d-none'); }
 
@@ -1457,6 +1561,7 @@ function showToast(msg, type='success') {
     document.getElementById('toast-msg').innerText = msg;
     new bootstrap.Toast(t).show();
 }
+
 function togglePrivacy() { document.body.classList.toggle('privacy-active'); const i = document.getElementById('privacy-icon'); i.classList.toggle('fa-eye'); i.classList.toggle('fa-eye-slash'); }
 function downloadBackup() { const a = document.createElement('a'); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appData)); a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; a.click(); }
 function openRestoreModal() { document.getElementById('backup-file-input').value=''; new bootstrap.Modal(document.getElementById('restoreBackupModal')).show(); }
@@ -1771,3 +1876,9 @@ function updateLiquidityCharts() {
         options: assetOptions
     });
 }
+
+window.addEventListener('resize', () => {
+    if (myChart) myChart.resize();
+    if (debitPieInstance) debitPieInstance.resize();
+    if (assetPieInstance) assetPieInstance.resize();
+});
