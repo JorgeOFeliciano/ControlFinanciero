@@ -21,8 +21,53 @@ const defaultData = {
         { id: 'freelance', label: 'Extra', icon: 'fa-laptop-code', color: '#f12711' },
         { id: 'gift', label: 'Regalo', icon: 'fa-gift', color: '#82269e' },
         { id: 'other', label: 'Otro', icon: 'fa-piggy-bank', color: '#343a40' }
-    ]
+    ],
+    // AÑADIR ESTO:
+    // Dentro de defaultData o appData
+    expenseSources: [
+        { id: 'food', label: 'Comida', icon: 'fa-utensils', color: '#ff4757' },
+        { id: 'transport', label: 'Transporte', icon: 'fa-car', color: '#3742fa' },
+        { id: 'services', label: 'Servicios', icon: 'fa-bolt', color: '#ffa502' },
+        { id: 'health', label: 'Salud', icon: 'fa-heartbeat', color: '#ff6b81' },
+        { id: 'other_exp', label: 'Otro', icon: 'fa-shopping-bag', color: '#747d8c' }
+    ],
+
+    subscriptions: [
+        { id: 1, name: 'Netflix', amount: 219, payDay: 15, category: 'Entertainment', linkedAccount: 'debit_0', active: true },
+        { id: 2, name: 'Spotify', amount: 129, payDay: 5, category: 'Entertainment', linkedAccount: 'debit_1', active: true }
+    ],
+
+    savingsGoals: []
 };
+
+/**
+ * Lanza una ráfaga de confeti en la pantalla
+ */
+function triggerSuccessCelebration() {
+    const duration = 3 * 1000;
+    const end = Date.now() + duration;
+
+    (function frame() {
+        confetti({
+            particleCount: 3,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+            colors: ['#0d6efd', '#11998e', '#38ef7d']
+        });
+        confetti({
+            particleCount: 3,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+            colors: ['#0d6efd', '#11998e', '#38ef7d']
+        });
+
+        if (Date.now() < end) {
+            requestAnimationFrame(frame);
+        }
+    }());
+}
 
 // --- DEFINICIÓN DE GRADIENTES ---
 const cardGradients = {
@@ -60,6 +105,9 @@ let myChart = null;
 let calendarViewDate = new Date();
 let depositoPendiente = null;
 let pendingActionCallback = null;
+let editingGoalIdx = null;
+let extraMonthlySim = 0;
+let tempSimValue = 0;
 
 const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 
@@ -162,18 +210,23 @@ function openHistoryModal() {
 }
 
 // --- HERRAMIENTAS DE CONFIRMACIÓN ---
-function askConfirmation(message, callback) {
-    pendingActionCallback = callback;
+
+function askConfirmation(message, callback, btnText = "Confirmar", btnClass = "btn-dark") {
+    pendingActionCallback = callback; 
     document.getElementById('confirm-msg-text').innerHTML = message;
-    new bootstrap.Modal(document.getElementById('confirmActionModal')).show();
+    const actionBtn = document.getElementById('confirm-btn-action');
+    actionBtn.innerText = btnText;
+    actionBtn.className = `btn ${btnClass} w-100 rounded-pill fw-bold`;
+    
+    const modalElem = document.getElementById('confirmActionModal');
+    bootstrap.Modal.getOrCreateInstance(modalElem).show();
 }
 
 function executePendingAction() {
-    if (pendingActionCallback) { pendingActionCallback(); pendingActionCallback = null; }
+    if (typeof pendingActionCallback === 'function') pendingActionCallback();
     bootstrap.Modal.getInstance(document.getElementById('confirmActionModal')).hide();
-    if (depositoPendiente) ejecutarDepositoReal();
+    pendingActionCallback = null;
 }
-
 // ==========================================
 //  LÓGICA DE EXCEL (ACTUALIZADA Y ROBUSTA)
 // ==========================================
@@ -553,11 +606,13 @@ function updateUI() {
     document.getElementById('total-assets-sum').innerText = fmt(tAssets + tCollected + tDebit);
     document.getElementById('total-income-display').innerText = fmt(tInc);
 
+    updateSummaryWidgets();
     renderCalendar();
+    renderSubscriptions();   
+    renderSavingsGoals();
     updateSelectors();
     updateChart();
     initProjectionWidget();
-    updateSummaryWidgets();
     updateLiquidityCharts();
 }
 
@@ -968,11 +1023,11 @@ function confirmDelete() {
 // --- CALENDARIO ---
 function changeMonth(n) { calendarViewDate.setMonth(calendarViewDate.getMonth() + n); updateUI(); }
 function renderCalendar() {
-    const now = new Date();
     const y = calendarViewDate.getFullYear();
     const m = calendarViewDate.getMonth();
     const names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
     document.getElementById('month-label').innerText = `${names[m]} ${y}`;
+    
     const first = new Date(y, m, 1).getDay();
     const dim = new Date(y, m + 1, 0).getDate();
     const off = first === 0 ? 6 : first - 1;
@@ -980,32 +1035,83 @@ function renderCalendar() {
     g.innerHTML = '';
 
     for (let i = 0; i < off; i++) g.innerHTML += `<div></div>`;
+
     for (let i = 1; i <= dim; i++) {
         const iso = `${y}-${String(m + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+        
+        // 1. Buscar Ingresos
         const inc = appData.incomes.find(x => x.date === iso);
-        let content = `${i}`; let styles = '';
+        
+        // 2. Buscar Suscripciones del día
+        const hasSub = (appData.subscriptions || []).some(s => s.payDay === i);
+        
+        // 3. Buscar Fechas de Tarjetas (Corte y Pago)
+        let cardAlert = '';
+        appData.cards.forEach(c => {
+            const d = getCardDates(c);
+            if (d.displayCutoff.getDate() === i && d.displayCutoff.getMonth() === m) 
+                cardAlert = '<i class="fas fa-cut text-primary" style="font-size:0.6rem"></i>';
+            if (d.displayLimit.getDate() === i && d.displayLimit.getMonth() === m) 
+                cardAlert = '<i class="fas fa-exclamation-triangle text-warning" style="font-size:0.6rem"></i>';
+        });
+
+        let content = `<div class="d-flex flex-column align-items-center justify-content-center h-100">
+                        <span class="small">${i}</span>
+                        <div class="d-flex gap-1">
+                            ${hasSub ? '<div class="bg-danger rounded-circle" style="width:4px; height:4px;"></div>' : ''}
+                            ${cardAlert}
+                        </div>
+                       </div>`;
+        let styles = '';
+
         if (inc) {
             const src = appData.incomeSources.find(s => s.id === inc.type) || appData.incomeSources[0];
-            content = `<div class="d-flex flex-column align-items-center justify-content-center h-100"><span style="font-size:0.7rem; opacity:0.8;">${i}</span><i class="fas ${src.icon}" style="color:${src.color}; font-size:0.9rem;"></i><span style="font-size:0.6rem; color:${src.color}; font-weight:bold;">${fmt(inc.amount).split('.')[0]}</span></div>`;
-            styles = `border: 1px solid ${src.color}; background-color: rgba(255,255,255,0.9);`;
+            styles = `border: 1px solid ${src.color}; background-color: ${src.color}10;`;
+            content = `<div class="d-flex flex-column align-items-center justify-content-center h-100">
+                        <span style="font-size:0.65rem; opacity:0.7;">${i}</span>
+                        <i class="fas ${src.icon}" style="color:${src.color}; font-size:0.8rem;"></i>
+                        <span style="font-size:0.55rem; color:${src.color}; font-weight:bold;">${fmt(inc.amount).split('.')[0]}</span>
+                        <div class="d-flex gap-1">${hasSub ? '<div class="bg-danger rounded-circle" style="width:3px; height:3px;"></div>' : ''}${cardAlert}</div>
+                       </div>`;
         }
+        
         g.innerHTML += `<div class="calendar-day" style="${styles}" onclick="dateClick('${iso}')">${content}</div>`;
     }
 }
-
 function dateClick(dateStr) {
     document.getElementById('cal-modal-date').value = dateStr;
     const dateObj = new Date(dateStr + 'T00:00:00');
-    document.getElementById('cal-modal-title').innerText = dateObj.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
+    const day = dateObj.getDate();
+    const month = dateObj.getMonth();
     
-    const targetSelect = document.getElementById('cal-target-account');
-    targetSelect.innerHTML = '';
-    const groupDebit = document.createElement('optgroup'); groupDebit.label = "Bancos";
-    appData.debit.forEach((d, i) => groupDebit.appendChild(new Option(d.name, `debit_${i}`)));
-    const groupAsset = document.createElement('optgroup'); groupAsset.label = "Efectivo";
-    appData.assets.forEach((a, i) => groupAsset.appendChild(new Option(a.name, `asset_${i}`)));
-    targetSelect.add(groupDebit); targetSelect.add(groupAsset);
+    document.getElementById('cal-modal-title').innerText = dateObj.toLocaleDateString('es-MX', { 
+        weekday: 'long', day: 'numeric', month: 'long' 
+    });
 
+    // 1. Llenar Selectores (Ingreso y Gasto) - Incluyendo Tarjetas de Crédito
+    const targetSelect = document.getElementById('cal-target-account');
+    const sourceSelect = document.getElementById('cal-expense-source');
+    
+    [targetSelect, sourceSelect].forEach(sel => {
+        if (!sel) return;
+        sel.innerHTML = '';
+        
+        // Grupo: Bancos (Débito)
+        const gDeb = document.createElement('optgroup'); gDeb.label = "Cuentas de Débito";
+        appData.debit.forEach((d, i) => gDeb.appendChild(new Option(d.name, `debit_${i}`)));
+        
+        // Grupo: Tarjetas de Crédito (NUEVO)
+        const gCred = document.createElement('optgroup'); gCred.label = "Tarjetas de Crédito";
+        appData.cards.forEach((c, i) => gCred.appendChild(new Option(c.name, `card_${i}`)));
+        
+        // Grupo: Efectivo
+        const gAss = document.createElement('optgroup'); gAss.label = "Efectivo / Activos";
+        appData.assets.forEach((a, i) => gAss.appendChild(new Option(a.name, `asset_${i}`)));
+        
+        sel.add(gDeb); sel.add(gCred); sel.add(gAss);
+    });
+
+    // 2. Cargar Ingreso Existente
     const existing = appData.incomes.find(x => x.date === dateStr);
     if (existing) {
         document.getElementById('cal-modal-amount').value = existing.amount;
@@ -1021,24 +1127,130 @@ function dateClick(dateStr) {
         renderIncomeOptions();
         document.getElementById('btn-delete-income').classList.add('d-none');
     }
+
+    // 3. Llenar la pestaña de AGENDA (Suscripciones + Fechas de Corte)
+    const agendaList = document.getElementById('cal-agenda-list');
+    if (agendaList) {
+        agendaList.innerHTML = '';
+        
+        // Buscar Suscripciones que caen este día y verificar si usan tarjeta
+        const daySubs = (appData.subscriptions || []).filter(s => parseInt(s.payDay) === day);
+        daySubs.forEach(s => {
+            let cardInfo = "";
+            // Si la suscripción está ligada a una tarjeta (card_X)
+            if (s.linkedAccount && s.linkedAccount.startsWith('card_')) {
+                const cardIdx = s.linkedAccount.split('_')[1];
+                const card = appData.cards[cardIdx];
+                if (card) {
+                    const dates = getCardDates(card);
+                    cardInfo = `<div class="text-info mt-1" style="font-size:0.65rem;">
+                                    <i class="fas fa-credit-card me-1"></i>Paga con ${card.name} (Corte: día ${dates.displayCutoff.getDate()})
+                                </div>`;
+                }
+            }
+
+            agendaList.innerHTML += `
+                <div class="border-bottom py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fw-bold"><i class="fas ${s.icon || 'fa-tag'} text-primary me-2"></i>${s.name}</span>
+                        <span class="fw-bold text-danger">${fmt(s.amount)}</span>
+                    </div>
+                    ${cardInfo}
+                </div>`;
+        });
+
+        // Buscar Fechas de Tarjetas (Corte y Pago)
+        appData.cards.forEach(c => {
+            const dates = getCardDates(c);
+            if (dates.displayCutoff.getDate() === day && dates.displayCutoff.getMonth() === month) {
+                agendaList.innerHTML += `<div class="py-2 text-primary fw-bold border-bottom small"><i class="fas fa-cut me-2"></i>Fecha de Corte: ${c.name}</div>`;
+            }
+            if (dates.displayLimit.getDate() === day && dates.displayLimit.getMonth() === month) {
+                agendaList.innerHTML += `<div class="py-2 text-danger fw-bold border-bottom small"><i class="fas fa-exclamation-triangle me-2"></i>Límite Pago: ${c.name}</div>`;
+            }
+        });
+
+        if (agendaList.innerHTML === '') agendaList.innerHTML = '<div class="text-center text-muted py-3">No hay eventos para este día.</div>';
+    }
+
+    // 4. Inicializar categorías de gasto
+    if (typeof renderExpenseOptions === 'function') renderExpenseOptions();
+
+    // 5. Mostrar Modal
     new bootstrap.Modal(document.getElementById('calendarModal')).show();
 }
 
 function renderIncomeOptions(selectedId = null) {
     const container = document.getElementById('income-options-container');
+    if (!container) return;
     container.innerHTML = '';
-    if (!appData.incomeSources || appData.incomeSources.length === 0) appData.incomeSources = defaultData.incomeSources;
+
+    if (!appData.incomeSources || appData.incomeSources.length === 0) appData.incomeSources = [...defaultData.incomeSources];
+
+    // 1. Renderizar categorías existentes
     appData.incomeSources.forEach((src, index) => {
         const checked = (selectedId === src.id) || (!selectedId && index === 0) ? 'checked' : '';
         const canDelete = appData.incomeSources.length > 1;
+
         container.insertAdjacentHTML('beforeend', `
             <div class="income-option-wrapper">
                 <input type="radio" class="btn-check" name="income-type" id="inc_${src.id}" value="${src.id}" ${checked} onchange="updateSourceStyles()">
-                <label class="income-option-label" for="inc_${src.id}" data-color="${src.color}"><i class="fas ${src.icon} fa-lg mb-2"></i><span class="small fw-bold text-center">${src.label}</span></label>
+                <label class="income-option-label" for="inc_${src.id}" data-color="${src.color}">
+                    <i class="fas ${src.icon} mb-1"></i>
+                    <span class="small fw-bold" style="font-size:0.65rem">${src.label}</span>
+                </label>
                 ${canDelete ? `<div class="btn-delete-source" onclick="deleteSource(${index}, event)"><i class="fas fa-times"></i></div>` : ''}
             </div>`);
     });
+
+    // 2. AGREGAR TARJETA DE "AÑADIR MÁS" AL FINAL
+    container.insertAdjacentHTML('beforeend', `
+        <div class="income-option-wrapper" onclick="openSourceManager('income')">
+            <div class="add-category-card shadow-sm">
+                <i class="fas fa-plus-circle mb-1"></i>
+                <span class="small fw-bold" style="font-size:0.65rem">Añadir</span>
+            </div>
+        </div>`);
+    
     updateSourceStyles();
+}
+
+function renderExpenseOptions(selectedId = null) {
+    const container = document.getElementById('expense-options-container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    // Inicializar si el arreglo no existe
+    if (!appData.expenseSources || appData.expenseSources.length === 0) {
+        appData.expenseSources = [...defaultData.expenseSources];
+    }
+
+    // 1. Renderizar categorías existentes de GASTOS
+    appData.expenseSources.forEach((src, index) => {
+        const checked = (selectedId === src.id) || (!selectedId && index === 0) ? 'checked' : '';
+        const canDelete = appData.expenseSources.length > 1;
+
+        container.insertAdjacentHTML('beforeend', `
+            <div class="income-option-wrapper">
+                <input type="radio" class="btn-check" name="expense-type" id="exp_${src.id}" value="${src.id}" ${checked} onchange="updateExpenseSourceStyles()">
+                <label class="income-option-label" for="exp_${src.id}" data-color="${src.color}">
+                    <i class="fas ${src.icon} mb-1"></i>
+                    <span class="small fw-bold" style="font-size:0.65rem">${src.label}</span>
+                </label>
+                ${canDelete ? `<div class="btn-delete-source" onclick="deleteExpenseSource(${index}, event)"><i class="fas fa-times"></i></div>` : ''}
+            </div>`);
+    });
+
+    // 2. AGREGAR TARJETA DE "AÑADIR MÁS" AL FINAL (para Gastos)
+    container.insertAdjacentHTML('beforeend', `
+        <div class="income-option-wrapper" onclick="openSourceManager('expense')">
+            <div class="add-category-card shadow-sm">
+                <i class="fas fa-plus-circle mb-1"></i>
+                <span class="small fw-bold" style="font-size:0.65rem">Añadir</span>
+            </div>
+        </div>`);
+    
+    updateExpenseSourceStyles();
 }
 
 function updateSourceStyles() {
@@ -1077,6 +1289,41 @@ function saveCalendarIncome() {
     }
 }
 
+function saveCalendarEvent(mode) {
+    const dateStr = document.getElementById('cal-modal-date').value;
+    
+    if (mode === 'income') {
+        saveCalendarIncome(); // Llama a tu función de ingreso que ya tienes
+    } 
+    else if (mode === 'expense') {
+        const amount = parseFloat(document.getElementById('cal-expense-amount').value);
+        const source = document.getElementById('cal-expense-source').value;
+        const typeInp = document.querySelector('input[name="expense-type"]:checked');
+
+        if (amount > 0 && source) {
+            const [accType, idx] = source.split('_');
+            const categoryLabel = typeInp ? appData.expenseSources.find(s => s.id === typeInp.value).label : "Gasto";
+
+            // Restar saldo de la cuenta elegida
+            if (accType === 'debit') {
+                if (appData.debit[idx].balance < amount) { showToast("Saldo insuficiente", "danger"); return; }
+                appData.debit[idx].balance -= amount;
+            } else {
+                if (appData.assets[idx].amount < amount) { showToast("Saldo insuficiente", "danger"); return; }
+                appData.assets[idx].amount -= amount;
+            }
+
+            addLog('pago', `Gasto: ${categoryLabel} (${dateStr})`, amount);
+            saveData();
+            updateUI();
+            bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();
+            showToast("💸 Gasto registrado correctamente");
+        } else {
+            alert("Por favor ingresa un monto y selecciona la cuenta.");
+        }
+    }
+}
+
 function deleteCalendarIncome() {
     const dateStr = document.getElementById('cal-modal-date').value;
     const item = appData.incomes.find(x => x.date === dateStr);
@@ -1091,27 +1338,223 @@ function deleteCalendarIncome() {
     showToast('Ingreso eliminado');
 }
 
-// --- FUENTES PERSONALIZADAS ---
-function openSourceManager() { bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide(); document.getElementById('new-source-name').value = ''; setSourceIcon('fa-briefcase'); new bootstrap.Modal(document.getElementById('manageSourceModal')).show(); }
-function setSourceIcon(icon) { document.getElementById('new-source-icon').value = icon; updateSourcePreview(); }
-function updateSourcePreview() {
-    const n = document.getElementById('new-source-name').value || 'Nombre';
-    const c = document.querySelector('input[name="source-color"]:checked').value;
-    const box = document.getElementById('source-preview-box');
-    box.style.background = c; box.style.color = 'white';
-    document.getElementById('source-preview-text').innerText = n;
-}
+function saveCalendarExpense() {
+    const amount = parseFloat(document.getElementById('cal-expense-amount').value);
+    const source = document.getElementById('cal-expense-source').value;
+    const typeInp = document.querySelector('input[name="expense-type"]:checked');
 
-function saveNewSource() {
-    const n = document.getElementById('new-source-name').value.trim();
-    if(n){ 
-        appData.incomeSources.push({ id: 'custom_'+Date.now(), label: n, icon: document.getElementById('new-source-icon').value, color: document.querySelector('input[name="source-color"]:checked').value });
-        saveData(); bootstrap.Modal.getInstance(document.getElementById('manageSourceModal')).hide();
-        dateClick(document.getElementById('cal-modal-date').value);
+    if (amount > 0 && source && typeInp) {
+        const [accType, idx] = source.split('_');
+        const categoryId = typeInp.value;
+        const category = appData.expenseSources.find(s => s.id === categoryId);
+
+        // 1. Restar saldo (Validación de saldo)
+        const account = accType === 'debit' ? appData.debit[idx] : appData.assets[idx];
+        const currentBalance = accType === 'debit' ? account.balance : account.amount;
+
+        if (amount > currentBalance) {
+            showToast("Saldo insuficiente", "danger");
+            return;
+        }
+
+        if (accType === 'debit') appData.debit[idx].balance -= amount;
+        else appData.assets[idx].amount -= amount;
+
+        // 2. Log e Historial
+        addLog('pago', `Gasto: ${category.label}`, amount);
+        
+        saveData();
+        updateUI();
+        bootstrap.Modal.getInstance(document.getElementById('calendarModal')).hide();
+        showToast(`💸 ${category.label} registrado correctamente`);
+    } else {
+        alert("Por favor completa el monto y selecciona una categoría");
     }
 }
 
-function deleteSource(idx, e) { e.preventDefault(); e.stopPropagation(); if(appData.incomeSources.length>1 && confirm('Borrar fuente?')) { appData.incomeSources.splice(idx, 1); saveData(); renderIncomeOptions(appData.incomeSources[0].id); }}
+
+// Actualización para que cada tarjeta use su color asignado
+function updateExpenseSourceStyles() {
+    document.querySelectorAll('#expense-options-container .income-option-label').forEach(lbl => {
+        const inp = document.getElementById(lbl.getAttribute('for'));
+        const col = lbl.getAttribute('data-color'); // Lee el color dinámico
+
+        if (inp && inp.checked) {
+            // Estilo Seleccionado: Fondo de color y texto blanco
+            lbl.style.background = col;
+            lbl.style.color = 'white';
+            lbl.style.borderColor = 'transparent';
+            lbl.style.boxShadow = `0 4px 10px ${col}40`; 
+        } else {
+            // Estilo Desactivado: Fondo blanco y texto gris
+            lbl.style.background = 'white';
+            lbl.style.color = '#6c757d';
+            lbl.style.borderColor = '#eee';
+            lbl.style.boxShadow = 'none';
+        }
+    });
+}
+// Alerta de eliminación
+function deleteExpenseSource(idx, e) {
+    e.preventDefault(); e.stopPropagation();
+    const name = appData.expenseSources[idx].label;
+    
+    askConfirmation(`¿Eliminar categoría de gasto: <b>${name}</b>?`, () => {
+        appData.expenseSources.splice(idx, 1);
+        saveData();
+        renderExpenseOptions();
+        showToast("Categoría eliminada", "info");
+    });
+}
+
+// Añadir nueva categoría rápida
+function addExpenseCategory() {
+    const name = prompt("Nombre de la nueva categoría de gasto:");
+    if (name) {
+        appData.expenseSources.push({
+            id: 'exp_' + Date.now(),
+            label: name,
+            icon: 'fa-shopping-bag',
+            color: '#747d8c'
+        });
+        saveData();
+        renderExpenseOptions();
+    }
+}
+
+// --- FUENTES PERSONALIZADAS ---
+let currentManagerType = 'income'; // Controla si es Ingreso o Egreso
+
+function openSourceManager(type = 'income') {
+    currentManagerType = type;
+    
+    // 1. Configurar interfaz del modal
+    document.getElementById('source-manager-title').innerText = type === 'income' ? 'Nueva Fuente de Ingreso' : 'Nueva Categoría de Gasto';
+    document.getElementById('new-source-name').value = '';
+    
+    // 2. Resetear a valores por defecto
+    setSourceIcon('fa-briefcase');
+    document.getElementById('sc_green').checked = true;
+    
+    // 3. Cerrar calendario y abrir manager
+    const calModal = bootstrap.Modal.getInstance(document.getElementById('calendarModal'));
+    if (calModal) calModal.hide();
+    
+    new bootstrap.Modal(document.getElementById('manageSourceModal')).show();
+    updateSourcePreview();
+}
+
+function setSourceIcon(icon) {
+    // 1. Actualizar el valor oculto para el guardado
+    document.getElementById('new-source-icon').value = icon;
+
+    // 2. Feedback Visual: Resaltar el botón clickeado
+    document.querySelectorAll('.btn-icon-select').forEach(btn => {
+        btn.classList.remove('btn-dark', 'text-white');
+        btn.classList.add('btn-outline-light', 'text-dark');
+    });
+
+    // Usamos currentTarget para identificar el botón exacto
+    const clickedBtn = event.currentTarget;
+    clickedBtn.classList.remove('btn-outline-light', 'text-dark');
+    clickedBtn.classList.add('btn-dark', 'text-white');
+
+    // 3. Actualizar la vista previa inmediatamente
+    updateSourcePreview();
+}
+
+function updateSourcePreview() {
+    const name = document.getElementById('new-source-name').value.trim() || 'Nombre';
+    const icon = document.getElementById('new-source-icon').value;
+    const color = document.querySelector('input[name="source-color"]:checked').value;
+
+    const previewBox = document.getElementById('source-preview-box');
+    const previewIcon = document.getElementById('source-preview-icon');
+    const previewText = document.getElementById('source-preview-text');
+
+    // Aplicar el color y el icono seleccionado al preview
+    previewBox.style.background = color;
+    previewBox.style.color = 'white';
+    previewIcon.className = `fas ${icon} fa-lg mb-2`;
+    previewText.innerText = name;
+}
+
+function updateSourcePreview() {
+    const name = document.getElementById('new-source-name').value.trim() || 'Nombre';
+    const icon = document.getElementById('new-source-icon').value;
+    const color = document.querySelector('input[name="source-color"]:checked').value;
+
+    const previewBox = document.getElementById('source-preview-box');
+    const previewIcon = document.getElementById('source-preview-icon');
+    const previewText = document.getElementById('source-preview-text');
+
+    // Aplicar estilos y contenido
+    previewBox.style.background = color;
+    previewBox.style.color = 'white';
+    previewIcon.className = `fas ${icon} fa-lg mb-2`;
+    previewText.innerText = name;
+}
+
+function saveNewSource() {
+    const name = document.getElementById('new-source-name').value.trim();
+    const icon = document.getElementById('new-source-icon').value;
+    const color = document.querySelector('input[name="source-color"]:checked').value;
+
+    if (!name) { alert("Ingresa un nombre"); return; }
+
+    // --- VALIDACIÓN DE DUPLICADOS ---
+    // Selecciona la lista activa según el tipo de manager abierto (Ingreso o Gasto)
+    const listToSearch = currentManagerType === 'income' ? appData.incomeSources : appData.expenseSources;
+    const isDuplicate = listToSearch.some(s => s.label.toLowerCase() === name.toLowerCase());
+
+    if (isDuplicate) {
+        alert(`La categoría "${name}" ya existe. Intenta con otro nombre para mantener tu base de datos limpia.`);
+        return;
+    }
+
+    const newCategory = {
+        id: (currentManagerType === 'income' ? 'inc_' : 'exp_') + Date.now(),
+        label: name,
+        icon: icon,
+        color: color
+    };
+
+    // Guardar en el array correspondiente
+    if (currentManagerType === 'income') {
+        appData.incomeSources.push(newCategory);
+    } else {
+        if (!appData.expenseSources) appData.expenseSources = [];
+        appData.expenseSources.push(newCategory);
+    }
+
+    saveData();
+    bootstrap.Modal.getInstance(document.getElementById('manageSourceModal')).hide();
+    
+    // Regresar al calendario y refrescar la vista
+    dateClick(document.getElementById('cal-modal-date').value);
+    showToast("Categoría creada con éxito");
+}
+
+// Reemplazo de funciones de eliminar para que sean simétricas
+function deleteSource(idx, e) { 
+    e.preventDefault(); e.stopPropagation(); 
+    if(appData.incomeSources.length > 1 && confirm('¿Borrar fuente de ingreso?')) { 
+        appData.incomeSources.splice(idx, 1); 
+        saveData(); renderIncomeOptions(); 
+    } 
+}
+
+function deleteExpenseSource(idx, e) { 
+    e.preventDefault(); e.stopPropagation(); 
+    if(appData.expenseSources.length > 1 && confirm('¿Borrar categoría de gasto?')) { 
+        appData.expenseSources.splice(idx, 1); 
+        saveData(); renderExpenseOptions(); 
+    } 
+}
+
+function deleteSource(idx, e) { e.preventDefault(); e.stopPropagation(); if(appData.incomeSources.length>1 && confirm('¿Borrar categoria de ingreso?')) { appData.incomeSources.splice(idx, 1); saveData(); renderIncomeOptions(appData.incomeSources[0].id); }}
+
+function deleteExpenseSource(idx, e) { e.preventDefault(); e.stopPropagation(); if(appData.expenseSources.length>1 && confirm('¿Borrar categoría de gastos?')) { appData.expenseSources.splice(idx, 1); saveData(); renderExpenseOptions(appData.expenseSources[0].id); }}
 
 // --- MAPEO DE LOGOS ONLINE (URLs Públicas) ---
 function getBankLogoUrl(name) {
@@ -1679,10 +2122,44 @@ function setupEmptyState() {
 }
 function updateSummaryWidgets() { renderLoansWidget(); renderIncomesWidget(); }
 function renderLoansWidget() {
-    const list = document.getElementById('widget-loans-list'); list.innerHTML = ''; let totalPending = 0;
-    appData.loans.forEach(l => { const rem = l.original - l.paid; if (rem > 0.1) { totalPending += rem; const pct = (l.paid/l.original)*100; list.innerHTML += `<div class="mb-3"><div class="d-flex justify-content-between"><span>${l.name}</span><span class="text-danger">${fmt(rem)}</span></div><div class="progress" style="height:6px"><div class="progress-bar bg-warning" style="width:${pct}%"></div></div></div>`; } });
-    document.getElementById('widget-loans-total').innerText = fmt(totalPending);
-    if(totalPending===0) list.innerHTML = `<div class="text-center text-muted py-4">Sin cobros pendientes</div>`;
+    const list = document.getElementById('widget-loans-list');
+    const totalHeader = document.getElementById('widget-loans-total');
+    const collectedElem = document.getElementById('widget-loans-collected');
+    const remainingElem = document.getElementById('widget-loans-remaining');
+
+    if (!list) return;
+
+    let totalOriginal = 0, totalCollected = 0, totalRemaining = 0, activeCount = 0;
+    list.innerHTML = '';
+
+    appData.loans.forEach((l, idx) => {
+        const rem = l.original - l.paid;
+        totalOriginal += l.original;
+        totalCollected += l.paid;
+        totalRemaining += rem;
+
+        if (rem > 0.1) {
+            activeCount++;
+            const pct = (l.paid / l.original) * 100;
+            list.innerHTML += `
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between mb-1" style="font-size: 0.75rem;">
+                        <span class="fw-bold text-dark">${l.name}</span>
+                        <span class="text-muted">${fmt(l.paid)} / <b>${fmt(l.original)}</b></span>
+                    </div>
+                    <div class="progress" style="height:5px;">
+                        <div class="progress-bar bg-success" style="width:${pct}%"></div>
+                    </div>
+                </div>`;
+        }
+    });
+
+    totalHeader.innerText = fmt(totalOriginal); // Header ahora muestra el CAPITAL prestado
+    collectedElem.innerText = fmt(totalCollected);
+    remainingElem.innerText = fmt(totalRemaining);
+    
+    const countBadge = document.getElementById('widget-loans-count');
+    if (countBadge) countBadge.innerText = `${activeCount} Activos`;
 }
 function renderIncomesWidget() {
     const list = document.getElementById('widget-income-list'); list.innerHTML = ''; let monthTotal = 0; const viewDate = calendarViewDate;
@@ -1876,6 +2353,692 @@ function updateLiquidityCharts() {
         options: assetOptions
     });
 }
+
+// --- LÓGICA DE SUSCRIPCIONES v0.36 ---
+// ================================================================
+// --- LÓGICA DE SUSCRIPCIONES v0.36 ---
+// ================================================================
+
+/**
+ * Muestra la lista de suscripciones con su estado de pago mensual
+ */
+function renderSubscriptions() {
+    const list = document.getElementById('subscription-list');
+    if (!list) return;
+
+    const currentMonthKey = calendarViewDate.getMonth() + '-' + calendarViewDate.getFullYear();
+    let total = 0;
+    list.innerHTML = '';
+
+    if (!appData.subscriptions) appData.subscriptions = [];
+
+    appData.subscriptions.forEach((sub, idx) => {
+        total += sub.amount;
+        const isPaid = sub.lastPaidMonth === currentMonthKey;
+        
+        // Identificar nombre de cuenta (Débito, Crédito o Activo)
+        const parts = sub.linkedAccount ? sub.linkedAccount.split('_') : ['asset', '0'];
+        const type = parts[0];
+        const accIdx = parseInt(parts[1]);
+        let accountName = "Cuenta";
+
+        // Mapeo seguro de nombres
+        if (type === 'debit') accountName = appData.debit[accIdx]?.name || 'Banco';
+        else if (type === 'card') accountName = appData.cards[accIdx]?.name || 'Tarjeta';
+        else accountName = appData.assets[accIdx]?.name || 'Efectivo';
+
+        list.innerHTML += `
+            <div class="list-group-item d-flex justify-content-between align-items-center px-0 border-0 mb-2 shadow-sm rounded-3 p-2 bg-white">
+                <div class="d-flex align-items-center">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center me-3 ${isPaid ? 'bg-success text-white' : 'bg-light text-primary'}" style="width: 40px; height: 40px;">
+                        <i class="fas ${sub.icon || 'fa-tag'}"></i>
+                    </div>
+                    <div>
+                        <div class="fw-bold small" style="font-size:0.8rem">${sub.name}</div>
+                        <div class="text-muted" style="font-size: 0.65rem;">Día ${sub.payDay} • ${accountName}</div>
+                        <span class="badge ${isPaid ? 'bg-success-subtle text-success' : 'bg-warning-subtle text-warning'}" style="font-size:0.55rem">
+                            ${isPaid ? 'CUBIERTO' : 'PENDIENTE'}
+                        </span>
+                    </div>
+                </div>
+                <div class="text-end pe-2">
+                    <div class="fw-bold text-dark small" style="font-size:0.8rem">${fmt(sub.amount)}</div>
+                    <div class="d-flex gap-1 justify-content-end mt-1">
+                        ${!isPaid ? `<button class="btn btn-sm btn-outline-success py-0 px-2" onclick="paySubscription(${idx})" style="font-size: 0.6rem;">Pagar</button>` : ''}
+                        <button class="btn btn-sm text-danger py-0 px-1" onclick="deleteSubscription(${idx})"><i class="fas fa-trash-alt" style="font-size:0.7rem"></i></button>
+                    </div>
+                </div>
+            </div>`;
+    });
+
+    const totalElem = document.getElementById('total-subscriptions');
+    if (totalElem) totalElem.innerText = fmt(total);
+}
+
+/**
+ * Ejecuta el proceso de pago restando saldo o añadiendo deuda a crédito
+ */
+function paySubscription(idx) {
+    const sub = appData.subscriptions[idx];
+    if (!sub) return;
+
+    const accountStr = sub.linkedAccount || "asset_0";
+    const [type, accIdxStr] = accountStr.split('_');
+    const accIdx = parseInt(accIdxStr);
+    const currentMonthKey = calendarViewDate.getMonth() + '-' + calendarViewDate.getFullYear();
+
+    // Invocamos el modal con texto y color verde (btn-success)
+    askConfirmation(
+        `¿Confirmas el pago de <b>${sub.name}</b> por ${fmt(sub.amount)}?`, 
+        () => {
+            // 1. Asegurar categoría de gasto para el reporte
+            if (!appData.expenseSources) appData.expenseSources = [];
+            let subCategory = appData.expenseSources.find(c => c.label === 'Suscripciones');
+            if (!subCategory) {
+                subCategory = { id: 'exp_subs', label: 'Suscripciones', icon: 'fa-sync', color: '#6f42c1' };
+                appData.expenseSources.push(subCategory);
+            }
+
+            let success = false;
+            let accountName = "";
+
+            // 2. Ejecutar según tipo de cuenta
+            if (type === 'card') {
+                const card = appData.cards[accIdx];
+                if (card) {
+                    if (!card.transactions) card.transactions = [];
+                    card.transactions.push({
+                        desc: `Suscripción: ${sub.name}`,
+                        amount: sub.amount,
+                        date: new Date().toISOString().split('T')[0],
+                        months: 1,
+                        paidCycles: 0
+                    });
+                    accountName = card.name;
+                    success = true;
+                }
+            } 
+            else if (type === 'debit') {
+                const acc = appData.debit[accIdx];
+                if (acc && acc.balance >= sub.amount) {
+                    acc.balance -= sub.amount;
+                    accountName = acc.name;
+                    success = true;
+                } else { 
+                    showToast("Saldo insuficiente en cuenta", "danger"); 
+                    return; 
+                }
+            } 
+            else if (type === 'asset') {
+                const acc = appData.assets[accIdx];
+                if (acc && acc.amount >= sub.amount) {
+                    acc.amount -= sub.amount;
+                    accountName = acc.name;
+                    success = true;
+                } else { 
+                    showToast("Saldo insuficiente en efectivo", "danger"); 
+                    return; 
+                }
+            }
+
+            // 3. Finalizar y Actualizar
+            if (success) {
+                sub.lastPaidMonth = currentMonthKey;
+                addLog('pago', `Pago suscripción (${accountName}): ${sub.name}`, sub.amount);
+                saveData();
+                updateUI(); // Refresca lista y balances
+                showToast(`✅ ${sub.name} pagada correctamente`);
+            }
+        }, 
+        "Sí, pagar",  // Texto personalizado para el botón
+        "btn-success" // Color verde para la confirmación de pago
+    );
+}z
+/**
+ * Prepara el modal para añadir nuevas suscripciones
+ */
+function openSubscriptionModal() {
+    const select = document.getElementById('sub-account-select');
+    if (!select) return;
+    select.innerHTML = '';
+
+    // Llenar por grupos para mejor UX
+    const groups = [
+        { label: "Cuentas de Débito", data: appData.debit, prefix: "debit" },
+        { label: "Tarjetas de Crédito", data: appData.cards, prefix: "card" },
+        { label: "Efectivo", data: appData.assets, prefix: "asset" }
+    ];
+
+    groups.forEach(g => {
+        if (g.data && g.data.length > 0) {
+            const optGroup = document.createElement('optgroup');
+            optGroup.label = g.label;
+            g.data.forEach((item, i) => {
+                optGroup.appendChild(new Option(item.name, `${g.prefix}_${i}`));
+            });
+            select.add(optGroup);
+        }
+    });
+
+    new bootstrap.Modal(document.getElementById('addSubscriptionModal')).show();
+}
+
+/**
+ * Guarda una nueva suscripción en la base de datos
+ */
+function saveNewSubscription() {
+    const name = document.getElementById('sub-name').value;
+    const amount = parseFloat(document.getElementById('sub-amount').value);
+    const day = parseInt(document.getElementById('sub-payday').value);
+    const account = document.getElementById('sub-account-select').value;
+    const iconInp = document.querySelector('input[name="sub-icon"]:checked');
+    const icon = iconInp ? iconInp.value : 'fa-tag';
+
+    if (name && amount > 0 && day > 0 && day <= 31) {
+        if (!appData.subscriptions) appData.subscriptions = [];
+        appData.subscriptions.push({ 
+            id: Date.now(), 
+            name, 
+            amount, 
+            payDay: day, 
+            linkedAccount: account, 
+            icon, 
+            lastPaidMonth: '', 
+            active: true 
+        });
+        saveData(); 
+        updateUI();
+        bootstrap.Modal.getInstance(document.getElementById('addSubscriptionModal')).hide();
+        showToast("✅ Suscripción guardada");
+    } else {
+        alert("Por favor completa los campos correctamente (Día 1-31)");
+    }
+}
+
+function deleteSubscription(idx) {
+    const sub = appData.subscriptions[idx];
+    
+    askConfirmation(
+        `¿Deseas eliminar definitivamente la suscripción a <b>${sub.name}</b>?`, 
+        () => {
+            appData.subscriptions.splice(idx, 1);
+            saveData();
+            updateUI();
+            showToast("Suscripción eliminada", "info");
+        },
+        "Sí, eliminar", // Cambia el texto del botón
+        "btn-danger"    // Cambia el color a ROJO
+    );
+}
+// No olvides llamar a renderSubscriptions() dentro de tu updateUI() principal
+
+// 1. Inicialización
+if (!appData.savingsGoals) appData.savingsGoals = [];
+
+// 2. Motor Predictivo (Ajustado)
+function getProjectedDate(remainingAmount) {
+    const monthlySavingsAverage = (appData.totalIncome - appData.totalExpense) || 1000;
+    if (monthlySavingsAverage <= 0) return "Ahorro insuficiente";
+
+    const monthsToGoal = Math.ceil(remainingAmount / monthlySavingsAverage);
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + monthsToGoal);
+
+    return targetDate.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+}
+
+// --- 1. RENDERIZADO CON SALÓN DE LA FAMA ---
+function renderSavingsGoals() {
+    const container = document.getElementById('savings-goals-list');
+    const completedContainer = document.getElementById('completed-goals-list');
+    const completedSection = document.getElementById('completed-goals-section');
+    
+    if (!container || !completedContainer) {
+        console.error("Error: Contenedores de metas no encontrados en el HTML.");
+        return;
+    }
+
+    container.innerHTML = '';
+    completedContainer.innerHTML = '';
+    
+    if (!appData.savingsGoals || appData.savingsGoals.length === 0) {
+        container.innerHTML = `<div class="text-center py-4 text-muted small">Sin metas activas.</div>`;
+        if (completedSection) completedSection.classList.add('d-none');
+        return;
+    }
+
+    appData.savingsGoals.sort((a, b) => b.priority - a.priority);
+    const hoy = new Date();
+    let completedCount = 0;
+
+    appData.savingsGoals.forEach((goal, idx) => {
+        const remaining = goal.target - goal.current;
+        const progress = Math.min((goal.current / goal.target) * 100, 100);
+        const isCompleted = remaining <= 0;
+
+        if (isCompleted) {
+            completedCount++;
+            completedContainer.innerHTML += `
+                <div class="p-3 mb-2 rounded-3 border d-flex justify-content-between align-items-center shadow-sm animate__animated animate__fadeInUp" 
+                    style="background: linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%); border-color: #d4af37 !important;">
+                    <div>
+                        <div class="fw-bold text-dark small"><i class="fas fa-medal text-warning me-1"></i> ${goal.name}</div>
+                        <div class="text-muted" style="font-size: 0.55rem;">META LOGRADA EL ${goal.lastDepositDate ? new Date(goal.lastDepositDate).toLocaleDateString() : 'RECIENTE'}</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold text-success small">${fmt(goal.target)}</div>
+                        <span class="badge bg-warning text-dark rounded-pill" style="font-size:0.45rem;">GOLD STATUS</span>
+                    </div>
+                </div>`;
+        } else {
+            let daysInactive = goal.lastDepositDate ? Math.floor((hoy - new Date(goal.lastDepositDate)) / (1000 * 60 * 60 * 24)) : 0;
+            const isInactiveAlert = (goal.priority == "3" && daysInactive > 7);
+            const p = { "3": "bg-danger", "2": "bg-warning text-dark", "1": "bg-info" }[goal.priority] || "bg-secondary";
+
+            container.innerHTML += `
+                <div class="mb-4 p-3 rounded-3 shadow-sm bg-white border goal-item-card" onclick="openGoalDetail(${idx})" style="cursor:pointer; ${isInactiveAlert ? 'border-left: 5px solid #ffc107 !important;' : ''}">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <span class="badge ${p} mb-1" style="font-size: 0.55rem;">PRIORIDAD ${goal.priority}</span>
+                            ${isInactiveAlert ? `<span class="badge bg-warning text-dark ms-1" style="font-size: 0.55rem;"><i class="fas fa-clock"></i> INACTIVA ${daysInactive}D</span>` : ''}
+                            <div class="fw-bold text-dark" style="font-size: 0.95rem;">${goal.name}</div>
+                        </div>
+                        <div class="d-flex gap-2" onclick="event.stopPropagation();">
+                            <button class="btn btn-sm p-0 text-muted" onclick="openGoalModal(${idx})"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm p-0 text-danger" onclick="deleteGoal(${idx})"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </div>
+                    <div class="progress mb-3" style="height: 8px; border-radius: 10px; background-color: #f0f2f5;">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             style="width: ${progress}%; background-color: ${goal.priority == 3 ? '#dc3545' : '#0d6efd'}"></div>
+                    </div>
+                    <div class="row g-1 text-center mb-2">
+                        <div class="col-4"><div class="py-2 bg-light rounded-2 border"><div class="text-muted small-text" style="font-size:0.5rem">OBJETIVO</div><div class="fw-bold small">${fmt(goal.target)}</div></div></div>
+                        <div class="col-4"><div class="py-2 bg-light rounded-2 border"><div class="text-muted small-text" style="font-size:0.5rem">AHORRADO</div><div class="fw-bold text-primary small">${fmt(goal.current)}</div></div></div>
+                        <div class="col-4"><div class="py-2 bg-light rounded-2 border"><div class="text-muted small-text" style="font-size:0.5rem">RESTANTE</div><div class="fw-bold text-danger small">${fmt(remaining)}</div></div></div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted" style="font-size: 0.6rem;"><i class="fas fa-calendar-alt me-1"></i>Estimado: <b>${getProjectedDate(remaining, 0)}</b></small>
+                        <small class="fw-bold text-dark" style="font-size: 0.7rem;">${progress.toFixed(0)}%</small>
+                    </div>
+                </div>`;
+        }
+    });
+
+    if (completedSection) completedSection.className = completedCount > 0 ? "mt-4 d-block" : "d-none";
+}
+
+// FUNCIÓN PARA EL MODAL DE DETALLE (SIMULADOR INTERNO)
+function openGoalDetail(idx) {
+    const goal = appData.savingsGoals[idx];
+    const remaining = goal.target - goal.current;
+    const progress = Math.min((goal.current / goal.target) * 100, 100);
+    const isCompleted = remaining <= 0;
+
+    // 1. GESTIÓN DE NOTAS Y ÁNIMO (Inyección de Ánimo Dinámica)
+    const notesCont = document.getElementById('detail-notes-container');
+    const notesText = document.getElementById('detail-notes-text');
+    
+    if (goal.notes) {
+        notesCont.classList.remove('d-none');
+        notesText.innerHTML = `<i class="fas fa-quote-left me-2 opacity-25"></i>${goal.notes}`;
+    } else if (isCompleted) {
+        notesCont.classList.remove('d-none');
+        notesText.innerHTML = `<i class="fas fa-trophy me-2 text-warning"></i>¡Lo lograste! Este dinero ya es tuyo.`;
+    } else if (progress > 80) { // <-- NUEVO: Mensaje de recta final
+        notesCont.classList.remove('d-none');
+        notesText.innerHTML = `<i class="fas fa-flag-checkered me-2 text-success"></i>¡Estás en la recta final! Solo un poco más.`;
+    } else if (progress > 50) {
+        notesCont.classList.remove('d-none');
+        notesText.innerHTML = `<i class="fas fa-rocket me-2 text-primary"></i>¡Ya pasaste la mitad! Mantén el ritmo.`;
+    } else {
+        notesCont.classList.add('d-none');
+    }
+
+    // 2. LLENADO DE DATOS ESTÁTICOS
+    document.getElementById('detail-goal-name').innerText = goal.name;
+    document.getElementById('detail-target').innerText = fmt(goal.target);
+    document.getElementById('detail-current').innerText = fmt(goal.current);
+    document.getElementById('detail-remaining').innerText = isCompleted ? "$0.00" : fmt(remaining);
+    document.getElementById('detail-percent-text').innerText = `${progress.toFixed(0)}%`;
+
+    // 3. BARRA Y PRIORIDAD
+    const bar = document.getElementById('detail-progress-bar');
+    const badgePrio = document.getElementById('detail-badge-prio');
+    bar.style.width = progress + '%';
+    
+    const prioData = {
+        "3": { label: "ALTA (3)", class: "bg-danger text-white" },
+        "2": { label: "MEDIA (2)", class: "bg-warning text-dark" },
+        "1": { label: "BAJA (1)", class: "bg-info text-white" }
+    }[goal.priority] || { label: "SIN PRIORIDAD", class: "bg-secondary text-white" };
+
+    badgePrio.innerText = isCompleted ? "COMPLETADA" : prioData.label;
+    badgePrio.className = `badge rounded-pill ${isCompleted ? 'bg-success' : prioData.class}`;
+    bar.className = `progress-bar progress-bar-striped progress-bar-animated ${isCompleted ? 'bg-success' : (goal.priority == 3 ? 'bg-danger' : 'bg-primary')}`;
+
+    // 4. FUNCIÓN REACTIVA DE MÉTRICAS (Días + Urgencia)
+    const updateDaysMetric = (extraSim = 0) => {
+        const baseSaving = (appData.totalIncome - appData.totalExpense) || 1000;
+        const totalMonthly = baseSaving + extraSim;
+        const daysElem = document.getElementById('detail-days-left');
+        
+        // Limpiar estados previos <-- IMPORTANTE PARA UX
+        daysElem.classList.remove('urgency-blink', 'text-danger', 'text-success', 'text-dark');
+
+        if (isCompleted) {
+            daysElem.innerText = "¡META CUMPLIDA!";
+            daysElem.classList.add('text-success', 'fw-bold');
+            return;
+        }
+
+        if (totalMonthly <= 0) {
+            daysElem.innerText = "Ajusta tu capacidad de ahorro";
+            daysElem.classList.add('text-muted');
+            return;
+        }
+
+        const monthsLeft = remaining / totalMonthly;
+        const daysLeft = Math.ceil(monthsLeft * 30.44);
+        daysElem.innerText = `${daysLeft.toLocaleString()} días approx.`;
+        
+        if (daysLeft <= 30) {
+            daysElem.classList.add('fw-bold', 'text-danger', 'urgency-blink');
+        } else {
+            daysElem.classList.add('fw-bold', 'text-dark');
+        }
+    };
+
+    // 5. MÉTRICAS DE CONSISTENCIA Y ÚLTIMO MOVIMIENTO
+    document.getElementById('detail-last-move').innerText = goal.lastDepositDate 
+        ? new Date(goal.lastDepositDate).toLocaleDateString('es-MX', {day:'numeric', month:'short'}) 
+        : "Sin registros";
+
+    const daysInactive = goal.lastDepositDate ? Math.floor((new Date() - new Date(goal.lastDepositDate)) / (1000 * 60 * 60 * 24)) : 99;
+    const consistBadge = document.getElementById('detail-consistency-badge');
+    
+    if (isCompleted) {
+        consistBadge.innerText = "GOLD STATUS"; consistBadge.className = "badge bg-warning text-dark"; // <-- CAMBIO A ORO
+    } else if (daysInactive <= 7) {
+        consistBadge.innerText = "¡MUY ACTIVA!"; consistBadge.className = "badge bg-primary";
+    } else {
+        consistBadge.innerText = "REQUIERE ATENCIÓN"; consistBadge.className = "badge bg-warning text-dark";
+    }
+
+    // --- 6. SIMULADOR REACTIVO CON LÍMITE Y RECOMPENSA VISUAL ---
+    const slider = document.getElementById('detail-sim-slider');
+    const simValLabel = document.getElementById('detail-sim-value');
+    const projDateLabel = document.getElementById('detail-projected-date');
+
+    // REPARACIÓN: Usamos la variable btnAbono sin 'const' para evitar el error de redeclaración
+    // O asegúrate de que btnAbono esté declarada una sola vez al inicio de la función.
+    const btnAbonoElement = document.getElementById('detail-btn-abono'); 
+
+    // Configuración dinámica del slider
+    slider.max = Math.max(0, remaining); 
+    slider.value = 0;
+
+    // FIX: Usamos step de 1 para que siempre pueda llegar al monto exacto restante
+    slider.step = 1; 
+
+    simValLabel.innerText = `+ $0/mes`;
+    projDateLabel.innerText = getProjectedDate(remaining, 0);
+    updateDaysMetric(0); 
+
+    slider.oninput = function() {
+        const val = parseInt(this.value);
+        simValLabel.innerText = `+ ${fmt(val)}/mes`;
+        projDateLabel.innerText = getProjectedDate(remaining, val);
+        updateDaysMetric(val); 
+
+        // Lógica de "Brillo de Meta Alcanzada"
+        // Si el usuario desliza hasta el total restante (o muy cerca por redondeo)
+        if (val >= remaining && remaining > 0) {
+            btnAbonoElement.classList.remove('btn-primary', 'shadow-blue');
+            btnAbonoElement.classList.add('btn-success', 'glow-finish');
+            btnAbonoElement.innerHTML = `<i class="fas fa-check-circle me-2 animate__animated animate__bounceIn"></i> ¡LIQUIDAR META AHORA!`;
+        } else {
+            btnAbonoElement.classList.add('btn-primary', 'shadow-blue');
+            btnAbonoElement.classList.remove('btn-success', 'glow-finish');
+            btnAbonoElement.innerHTML = `<i class="fas fa-coins me-2"></i> Abonar a esta meta`;
+        }
+    };
+    // 7. BOTÓN DE HISTORIAL Y ABONO
+    // Dentro de openGoalDetail(idx)...
+
+    const historySection = document.getElementById('detail-history-link-container');
+    if (historySection) {
+        const totalAbonos = goal.history ? goal.history.length : 0;
+        
+        if (totalAbonos > 0) {
+            historySection.innerHTML = `
+                <button class="btn btn-sm btn-link p-0 text-decoration-none fw-bold text-primary" 
+                        onclick="openGoalHistory(${idx})">
+                    <i class="fas fa-list-ul me-1"></i> Ver historial (${totalAbonos} abonos)
+                </button>`;
+        } else {
+            historySection.innerHTML = `<small class="text-muted italic">Aún no hay abonos registrados</small>`;
+        }
+    }
+
+    const btnAbono = document.getElementById('detail-btn-abono');
+    const simBlock = slider.closest('.bg-primary'); // <-- NUEVO: Referencia al bloque del simulador
+
+    if(isCompleted) {
+        btnAbonoElement.classList.add('d-none');
+        if(simBlock) simBlock.classList.add('d-none'); // Ocultar simulador si ya se cumplió
+        projDateLabel.innerHTML = "<span class='text-success fw-bold'>✨ Dinero listo en el Salón de la Fama</span>";
+    } else {
+        btnAbonoElement.classList.remove('d-none');
+        if(simBlock) simBlock.classList.remove('d-none');
+        btnAbonoElement.onclick = () => {
+            bootstrap.Modal.getInstance(document.getElementById('goalDetailModal')).hide();
+            openGoalAbonoModal(idx);
+        };
+    }
+
+    new bootstrap.Modal(document.getElementById('goalDetailModal')).show();
+}
+
+// Ajustar getProjectedDate para aceptar simulación
+function getProjectedDate(remainingAmount, extraSim = 0) {
+    const monthlySavingsAverage = (appData.totalIncome - appData.totalExpense) || 1000;
+    const totalCapacidad = monthlySavingsAverage + extraSim;
+
+    if (totalCapacidad <= 0) return "Ahorro insuficiente";
+
+    const monthsToGoal = Math.ceil(remainingAmount / totalCapacidad);
+    const targetDate = new Date();
+    targetDate.setMonth(targetDate.getMonth() + monthsToGoal);
+
+    return targetDate.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+}
+/**
+ * Procesa la transferencia del saldo a la meta
+ */
+function processGoalDeposit() {
+    const idx = document.getElementById('deposit-goal-idx').value;
+    const amount = parseFloat(document.getElementById('deposit-goal-amount').value);
+    const source = document.getElementById('deposit-goal-source').value;
+
+    if (isNaN(amount) || amount <= 0) return;
+
+    const [type, accIdx] = source.split('_');
+    const account = type === 'debit' ? appData.debit[accIdx] : appData.assets[accIdx];
+    const balance = type === 'debit' ? account.balance : account.amount;
+
+    if (amount > balance) { showToast("Saldo insuficiente", "danger"); return; }
+
+    const goal = appData.savingsGoals[idx];
+
+    // REGISTRO TÉCNICO EN EL HISTORIAL DE LA META
+    if (!goal.history) goal.history = [];
+    goal.history.unshift({
+        date: new Date().toLocaleDateString('es-MX'),
+        timestamp: new Date().toISOString(),
+        amount: amount,
+        from: account.name
+    });
+
+    // Ejecutar movimiento real
+    if (type === 'debit') appData.debit[accIdx].balance -= amount;
+    else appData.assets[accIdx].amount -= amount;
+    goal.current += amount;
+    goal.lastDepositDate = new Date().toISOString();
+
+    saveData();
+    updateUI();
+    bootstrap.Modal.getInstance(document.getElementById('depositGoalModal')).hide();
+    
+    if (goal.current >= goal.target) {
+        triggerSuccessCelebration(); // Confetti
+        showToast("🏆 ¡Meta cumplida y enviada al Salón de la Fama!");
+    } else {
+        showToast("✅ Abono registrado en el historial");
+    }
+}
+
+function openGoalHistory(idx) {
+    // 1. OBTENER Y CERRAR EL MODAL DE DETALLE (El que está abierto)
+    const detailModalEl = document.getElementById('goalDetailModal');
+    const detailInstance = bootstrap.Modal.getInstance(detailModalEl);
+    if (detailInstance) {
+        detailInstance.hide();
+    }
+
+    // 2. POBLAR LOS DATOS (Lo que ya tenías)
+    const goal = appData.savingsGoals[idx];
+    const list = document.getElementById('goal-history-list');
+    document.getElementById('goal-history-title').innerText = "Historial: " + goal.name;
+    
+    list.innerHTML = '';
+
+    if (!goal.history || goal.history.length === 0) {
+        list.innerHTML = `<div class="text-center py-4 text-muted small">No hay abonos registrados todavía.</div>`;
+    } else {
+        goal.history.forEach(h => {
+            list.innerHTML += `
+                <div class="d-flex justify-content-between align-items-center border-bottom py-2">
+                    <div>
+                        <div class="fw-bold small" style="font-size: 0.75rem;">${h.from}</div>
+                        <div class="text-muted" style="font-size: 0.6rem;">${h.date}</div>
+                    </div>
+                    <div class="text-success fw-bold small">+${fmt(h.amount)}</div>
+                </div>`;
+        });
+    }
+    
+    // 3. ABRIR EL MODAL DE HISTORIAL
+    const historyModalEl = document.getElementById('goalHistoryModal');
+    const historyInstance = new bootstrap.Modal(historyModalEl);
+    historyInstance.show();
+}
+// 4. Funciones de Gestión
+function openGoalModal(idx = null) {
+    editingGoalIdx = idx;
+    const form = document.getElementById('goal-form');
+    if (form) form.reset();
+    
+    document.getElementById('goalModalLabel').innerText = idx !== null ? "Editar Meta" : "Nueva Meta";
+    
+    if (idx !== null) {
+        const g = appData.savingsGoals[idx];
+        document.getElementById('goal-name').value = g.name;
+        document.getElementById('goal-target').value = g.target;
+        document.getElementById('goal-current').value = g.current;
+        document.getElementById('goal-priority').value = g.priority;
+    }
+    
+    const modalEl = document.getElementById('goalModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+}
+
+function saveGoal() {
+    // 1. Obtener referencias a los elementos
+    const nameEl = document.getElementById('goal-name');
+    const targetEl = document.getElementById('goal-target');
+    const currentEl = document.getElementById('goal-current');
+    const priorityEl = document.getElementById('goal-priority');
+    const notes = document.getElementById('goal-notes').value.trim();
+
+    // 2. Validar que los elementos existan en el HTML
+    if (!nameEl || !targetEl) {
+        console.error("Error: No se encontraron los inputs del modal en el HTML.");
+        return;
+    }
+
+    const name = nameEl.value.trim();
+    const target = parseFloat(targetEl.value);
+    const current = currentEl ? (parseFloat(currentEl.value) || 0) : 0;
+    const priority = priorityEl ? priorityEl.value : "2"; // Default "Media" si no existe el select
+
+    // 3. Validar datos
+    if (name && target > 0) {
+        const goalData = { 
+            name, target, current, priority, notes, // <--- Se añade 'notes'
+            lastDepositDate: editingGoalIdx !== null ? appData.savingsGoals[editingGoalIdx].lastDepositDate : null
+        };
+
+        if (editingGoalIdx !== null) {
+            appData.savingsGoals[editingGoalIdx] = goalData;
+        } else {
+            if (!appData.savingsGoals) appData.savingsGoals = [];
+            appData.savingsGoals.push(goalData);
+        }
+
+        // 4. Guardar y Refrescar
+        saveData(); 
+        updateUI();
+        
+        // 5. Cerrar Modal de forma segura
+        const modalEl = document.getElementById('goalModal');
+        const modalInstance = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modalInstance.hide();
+        
+        showToast("✅ Meta guardada");
+    } else {
+        showToast("Ingresa nombre y monto válido", "warning");
+    }
+}
+
+function deleteGoal(idx) {
+    askConfirmation(`¿Borrar meta <b>${appData.savingsGoals[idx].name}</b>?`, () => {
+        appData.savingsGoals.splice(idx, 1);
+        updateUI();
+    }, "Sí, eliminar", "btn-danger");
+}
+
+/**
+ * Abre el modal y carga las cuentas de donde puedes sacar dinero
+ */
+function openGoalAbonoModal(idx) {
+    const goal = appData.savingsGoals[idx];
+    if (!goal) return;
+
+    // 1. Llenar datos básicos en el modal
+    document.getElementById('deposit-goal-idx').value = idx;
+    document.getElementById('deposit-goal-name').innerText = goal.name;
+    document.getElementById('deposit-goal-amount').value = '';
+
+    // 2. Cargar las fuentes de dinero (Débito y Efectivo)
+    const select = document.getElementById('deposit-goal-source');
+    select.innerHTML = '';
+
+    // Grupo Débito
+    const gDeb = document.createElement('optgroup'); gDeb.label = "Cuentas de Débito";
+    appData.debit.forEach((d, i) => gDeb.appendChild(new Option(`${d.name} (${fmt(d.balance)})`, `debit_${i}`)));
+
+    // Grupo Efectivo
+    const gAss = document.createElement('optgroup'); gAss.label = "Efectivo";
+    appData.assets.forEach((a, i) => gAss.appendChild(new Option(`${a.name} (${fmt(a.amount)})`, `asset_${i}`)));
+
+    select.add(gDeb); select.add(gAss);
+
+    // 3. Mostrar el modal
+    new bootstrap.Modal(document.getElementById('depositGoalModal')).show();
+}
+
+
 
 window.addEventListener('resize', () => {
     if (myChart) myChart.resize();

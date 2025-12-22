@@ -500,6 +500,101 @@ body.privacy-active #total-income-display {
     background: white;
 }
 
+/* 1. ESTILOS COMUNES PARA TODAS LAS TARJETAS (Categorías y Añadir) */
+/* Esto asegura que todas tengan exactamente el mismo tamaño y estructura */
+.income-option-label,
+.add-category-card {
+    width: 90px;  /* Ancho fijo */
+    height: 90px; /* Alto fijo (igual al ancho para que sea cuadrada) */
+    
+    display: flex;
+    flex-direction: column; /* Apila icono sobre texto */
+    justify-content: center; /* Centra verticalmente */
+    align-items: center; /* Centra horizontalmente */
+    
+    padding: 10px;
+    margin: 5px; /* Espacio entre tarjetas */
+    border-radius: 16px; /* Bordes redondeados suaves */
+    box-sizing: border-box; /* Asegura que el padding no aumente el tamaño total */
+    position: relative; /* Necesario para posicionar la "X" de eliminar */
+    transition: all 0.2s ease-in-out; /* Suaviza los cambios al pasar el mouse o seleccionar */
+}
+
+/* 2. ESTILO ESPECÍFICO PARA CATEGORÍAS NORMALES (No seleccionadas) */
+.income-option-label {
+    border: 1px solid #dee2e6; /* Borde gris sutil */
+    background-color: #ffffff;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+/* 3. ESTILO PARA LA CATEGORÍA SELECCIONADA (Ej. Nómina) */
+/* Cuando el radio button asociado está marcado */
+.btn-check:checked + .income-option-label {
+    color: white !important;
+    border: none; /* Quitamos el borde para que se vea sólida */
+    box-shadow: 0 4px 8px rgba(17, 153, 142, 0.3); /* Sombra suave para resaltar */
+}
+/* Aseguramos que el icono interno también cambie a blanco */
+.btn-check:checked + .income-option-label i {
+    color: white !important;
+}
+
+/* 4. ESTILO ESPECÍFICO PARA LA TARJETA "AÑADIR" */
+.add-category-card {
+    border: 2px dashed #adb5bd; /* Borde punteado más notorio */
+    background-color: #f8f9fa; /* Fondo ligeramente gris */
+    color: #6c757d;
+    cursor: pointer;
+}
+.add-category-card:hover {
+    border-color: #11998e; /* Cambia de color al pasar el mouse */
+    color: #11998e;
+    background-color: #f0fdfc;
+}
+
+/* 5. ESTANDARIZAR TAMAÑOS DE ICONOS Y TEXTO INTERNOS */
+.income-option-label i,
+.add-category-card i {
+    font-size: 28px; /* Tamaño de icono uniforme y más grande */
+    margin-bottom: 8px; /* Espacio entre icono y texto */
+}
+
+.income-option-label span,
+.add-category-card span {
+    font-size: 11px;
+    font-weight: 700; /* Texto en negrita */
+    text-align: center;
+    line-height: 1.1;
+    width: 100%;
+    white-space: nowrap; /* Evita que el texto se rompa en dos líneas */
+    overflow: hidden;
+    text-overflow: ellipsis; /* Añade "..." si el texto es muy largo */
+}
+
+/* 6. POSICIONAR EL BOTÓN DE ELIMINAR ("X") */
+/* Se coloca en la esquina superior derecha, flotando sobre la tarjeta */
+.btn-delete-source {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    background-color: white; /* Fondo blanco para que resalte el icono rojo */
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    z-index: 10;
+    border: 1px solid #f8d7da;
+}
+.btn-delete-source i {
+    font-size: 12px; /* Tamaño de la "X" */
+    color: #dc3545; /* Color rojo */
+    margin-bottom: 0 !important; /* Resetear margen del icono general */
+}
+
 .income-option-label:hover { background-color: #f8f9fa; transform: translateY(-2px); }
 
 .btn-check:checked + .income-option-label {
@@ -794,8 +889,125 @@ body.privacy-active #total-income-display {
     .calendar-day { font-size: 0.7rem; aspect-ratio: 1; }
 }
 
+/* Evitar que los botones de 'Añadir' se pongan grises al hacer clic */
+.btn-link.text-success:focus, 
+.btn-link.text-success:active,
+.btn-link.text-success:hover {
+    color: #11998e !important; /* Mantiene el verde esmeralda */
+    text-decoration: none;
+    box-shadow: none;
+}
+
+.btn-link.text-primary:focus, 
+.btn-link.text-primary:active,
+.btn-link.text-primary:hover {
+    color: #0d6efd !important; /* Mantiene el azul primario */
+    text-decoration: none;
+    box-shadow: none;
+}
+
+/* Quitar el borde azul que pone Chrome/Edge al hacer clic */
+button:focus {
+    outline: none !important;
+}
+
+/* Estilo para la tarjeta de 'Añadir más' en la cuadrícula */
+.add-category-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 65px; /* Ajusta según el tamaño de tus otras tarjetas */
+    height: 65px;
+    border: 2px dashed #dee2e6;
+    border-radius: 12px;
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+.add-category-card:hover {
+    background-color: #ffffff;
+    border-color: #11998e;
+    color: #11998e;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+}
+
+.add-category-card i {
+    font-size: 1.2rem;
+}
+
+/* Ajuste para que el wrapper no interfiera con el click */
+.income-option-wrapper {
+    position: relative;
+}
+
+@keyframes pulse-red {
+        0% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.7; transform: scale(1.05); color: #ff0000; }
+        100% { opacity: 1; transform: scale(1); }
+    }
+    .urgency-blink {
+        animation: pulse-red 0.8s infinite;
+        font-weight: 800 !important;
+    }
+
 /* Notch de iPhone y áreas seguras */
 @supports (padding: env(safe-area-inset-top)) {
     .sidebar { padding-top: calc(25px + env(safe-area-inset-top)); }
     .main-content { padding-top: calc(70px + env(safe-area-inset-top)); }
+}
+
+/* Estilo para el slider dentro del simulador oscuro */
+.custom-range-warning::-webkit-slider-runnable-track { background: #444; }
+.custom-range-warning::-webkit-slider-thumb { background: #ffc107; }
+
+/* Animación de clic en el botón principal */
+.transform-active:active {
+    transform: scale(0.98);
+    transition: 0.1s;
+}
+
+/* Espaciado de los list-items */
+.list-group-item {
+    border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* Color suave para el slider */
+.custom-range::-webkit-slider-runnable-track {
+    background: #dee2e6;
+    height: 6px;
+    border-radius: 10px;
+}
+.custom-range::-webkit-slider-thumb {
+    background: #0d6efd;
+    margin-top: -5px;
+}
+
+/* Sombra azul suave para el botón */
+.shadow-blue {
+    box-shadow: 0 4px 14px 0 rgba(13, 110, 253, 0.3) !important;
+}
+
+/* Ajuste de fuentes para que no se vea amontonado */
+#goalDetailModal .fw-bold {
+    letter-spacing: -0.2px;
+}
+
+/* Animación de brillo para cuando el slider llega al máximo */
+@keyframes glow-green {
+    0% { box-shadow: 0 0 5px rgba(25, 135, 84, 0.4); }
+    50% { box-shadow: 0 0 20px rgba(25, 135, 84, 0.8); transform: scale(1.02); }
+    100% { box-shadow: 0 0 5px rgba(25, 135, 84, 0.4); }
+}
+
+.glow-finish {
+    animation: glow-green 1.5s infinite;
+    border: 2px solid white !important;
+}
+
+.transition-all {
+    transition: all 0.3s ease-in-out;
 }
