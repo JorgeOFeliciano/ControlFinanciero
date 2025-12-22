@@ -111,8 +111,13 @@ let tempSimValue = 0;
 
 const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 
+// Agrega esto donde inicializas tus variables globales
+if (!appData.archives) appData.archives = [];
+if (appData.lastSessionMonth === undefined) appData.lastSessionMonth = new Date().getMonth();
+
 // --- INICIALIZACIÓN ---
 document.addEventListener('DOMContentLoaded', () => {
+    // --- LÓGICA DE MENÚ Y SIDEBAR (Sin cambios) ---
     const menuToggle = document.getElementById('menuToggle');
     const sidebar = document.querySelector('.sidebar');
     const overlay = document.getElementById('sidebarOverlay');
@@ -126,7 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if(menuToggle) menuToggle.addEventListener('click', toggleMenu);
     if(overlay) overlay.addEventListener('click', toggleMenu);
 
-    // Cerrar menú automáticamente al cambiar de pestaña en móvil
     navLinks.forEach(link => {
         link.addEventListener('click', () => {
             if (window.innerWidth <= 768 && sidebar.classList.contains('active')) {
@@ -135,7 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 1. Préstamos
+    // --- INICIALIZACIÓN DE SORTABLE (Sin cambios) ---
     const loanBody = document.getElementById('loans-body');
     if (loanBody) {
         new Sortable(loanBody, {
@@ -147,15 +151,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Tarjetas de Débito (Grid)
     const debitGrid = document.getElementById('debit-grid');
     if (debitGrid) {
         new Sortable(debitGrid, {
-            animation: 150, ghostClass: 'sortable-ghost',
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            // --- AGREGA ESTAS LÍNEAS ---
+            delay: 100, // Retraso de 100ms antes de empezar a arrastrar
+            delayOnTouchOnly: true, // El retraso solo aplica en tablets/celulares
+            touchStartThreshold: 5,
             onEnd: (evt) => {
                 let oldI = evt.oldIndex;
                 let newI = evt.newIndex;
-                // Verificamos límites porque el botón "Nueva Tarjeta" también es hijo del grid
                 if (oldI < appData.debit.length && newI < appData.debit.length) {
                     const item = appData.debit.splice(oldI, 1)[0];
                     appData.debit.splice(newI, 0, item); saveData();
@@ -164,7 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Activos
     const assetsBody = document.getElementById('assets-body');
     if (assetsBody) {
         new Sortable(assetsBody, {
@@ -173,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statics = document.querySelectorAll('.static-row').length;
                 const oldI = evt.oldIndex - statics;
                 const newI = evt.newIndex - statics;
-
                 if (oldI >= 0 && newI >= 0 && appData.assets[oldI]) {
                     const item = appData.assets.splice(oldI, 1)[0];
                     appData.assets.splice(newI, 0, item); saveData();
@@ -182,7 +187,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    loadData();
+    // --- FLUJO DE DATOS (ORDEN CRÍTICO) ---
+
+    loadData(); // 1. Traer datos de LocalStorage
+
+    // 2. Preparar el terreno para el archivado si es la primera vez
+    if (!appData.archives) appData.archives = [];
+    if (appData.lastSessionMonth === undefined) {
+        appData.lastSessionMonth = new Date().getMonth();
+        saveData();
+    }
+
+    // 3. Ejecutar el "limpiador" mensual antes de mostrar nada
+    checkMonthlyArchive(); 
+
+    // 4. Mostrar la UI final ya procesada
     updateUI();
 });
 
@@ -449,6 +468,26 @@ function getBankColorHex(name) {
     return '#4b6cb7';
 }
 
+function compactFmt(value) {
+    if (value === 0) return '$0.00';
+    
+    // Si es menor a 1,000, usamos tu formato normal con decimales
+    if (Math.abs(value) < 1000) {
+        return fmt(value); 
+    }
+
+    const suffixes = ["", "k", "M", "B", "T"];
+    const suffixNum = Math.floor(("" + Math.floor(Math.abs(value))).length / 3);
+    
+    let shortValue = parseFloat((suffixNum !== 0 ? (value / Math.pow(1000, suffixNum)) : value).toPrecision(3));
+    
+    if (shortValue % 1 !== 0) {
+        shortValue = shortValue.toFixed(1);
+    }
+    
+    return '$' + shortValue + suffixes[suffixNum];
+}
+
 // --- UI UPDATE PRINCIPAL ---
 function updateUI() {
     let tDebt = 0, tLimit = 0, tMonthlyGlobal = 0;
@@ -551,24 +590,33 @@ function updateUI() {
         else if (nLower.includes('nu') || nLower.includes('mercado') || nLower.includes('master')) netIconClass = 'fab fa-cc-mastercard fa-lg';
         else if (nLower.includes('amex')) netIconClass = 'fab fa-cc-amex fa-lg';
 
+        // ... dentro de tu appData.debit.forEach ...
         dGrid.innerHTML += `
-        <div class="col-12 col-sm-6 col-lg-4 col-xl-3">
-            <div class="mini-card text-white" onclick="openEditModal('debit', ${i})" style="background: ${bgStyle};">
-                <div class="mb-auto opacity-75"><i class="${netIconClass}"></i></div>
-                <div class="d-flex justify-content-between align-items-end w-100">
-                    <div class="mini-card-name fw-bold pe-2" style="overflow:hidden; text-overflow:ellipsis;">${d.name}</div>
-                    <div class="text-end flex-shrink-0">
-                        <div class="small opacity-75" style="font-size: 0.6rem;">Saldo</div>
-                        <div class="mini-card-balance fw-bold">${fmt(d.balance)}</div>
-                    </div>
-                </div>
+    <div class="col-6 col-md-6 col-lg-4 p-2">
+        <div class="mini-card text-white shadow-sm" onclick="openEditModal('debit', ${i})" style="background: ${bgStyle};">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="opacity-75"><i class="${netIconClass}"></i></div>
+                <div class="mini-card-name fw-bold">${d.name}</div>
             </div>
-        </div>`;
+            
+            <div class="text-end mt-auto">
+                <div class="small opacity-75 d-none d-md-block" style="font-size: 0.55rem; letter-spacing: 0.5px;">SALDO</div>
+                <div class="mini-card-balance fw-bold">${compactFmt(d.balance)}</div>
+            </div>
+        </div>
+    </div>`;
     });
     
     // Botón de agregar nueva tarjeta
-    dGrid.innerHTML += `<div class="col-12 col-sm-6 col-lg-4 col-xl-3"><div class="mini-card mini-card-add h-100" onclick="openDepositModal()"><i class="fas fa-plus-circle fa-2x mb-2"></i><span class="small fw-bold">Nueva Tarjeta</span></div></div>`;
-    // 4. Activos
+    dGrid.innerHTML += `
+    <div class="col-6 col-md-6 col-lg-4 p-2">
+        <div class="mini-card mini-card-add shadow-sm" onclick="openDepositModal()">
+            <div class="d-flex flex-column align-items-center justify-content-center h-100">
+                <i class="fas fa-plus-circle fa-2x mb-2 opacity-50"></i>
+                <span class="small fw-bold text-uppercase" style="letter-spacing: 1px;">Nueva Tarjeta</span>
+            </div>
+        </div>
+    </div>`;    // 4. Activos
     let tAssets = 0; const ab = document.getElementById('assets-body'); ab.innerHTML = '';
     if (tCollected > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-primary"><i class="fas fa-undo-alt me-2"></i>Recuperado de Deudas</span></div></td><td class="text-end text-success fw-bold">${fmt(tCollected)}</td><td class="text-end"><i class="fas fa-lock text-muted"></i></td></tr>`;
     if (tDebit > 0) ab.innerHTML += `<tr class="static-row table-light"><td><div class="d-flex align-items-center"><span class="fw-bold text-dark"><i class="fas fa-credit-card me-2 text-primary"></i>Saldo en Tarjetas (Débito)</span></div></td><td class="text-end text-success fw-bold">${fmt(tDebit)}</td><td class="text-end"><i class="fas fa-lock text-muted"></i></td></tr>`;
@@ -3038,7 +3086,53 @@ function openGoalAbonoModal(idx) {
     new bootstrap.Modal(document.getElementById('depositGoalModal')).show();
 }
 
+function checkMonthlyArchive() {
+    const today = new Date();
+    const currentMonth = today.getMonth(); // 0-11
+    const currentYear = today.getFullYear();
 
+    // 1. Verificar si cambiamos de mes desde la última vez
+    if (appData.lastSessionMonth !== currentMonth) {
+        
+        // 2. Identificar las metas que ya están en el Salón de la Fama (completadas)
+        const toArchive = appData.savingsGoals.filter(goal => goal.current >= goal.target);
+
+        if (toArchive.length > 0) {
+            toArchive.forEach(goal => {
+                // Añadimos metadata de cierre antes de archivar
+                goal.archivedDate = today.toISOString();
+                goal.finalStatus = "SUCCESS";
+                
+                // Mover al baúl de recuerdos
+                appData.archives.push(goal);
+            });
+
+            // 3. Limpiar la lista activa: Dejamos solo las que NO se han terminado
+            appData.savingsGoals = appData.savingsGoals.filter(goal => goal.current < goal.target);
+
+            // 4. Feedback al usuario
+            setTimeout(() => {
+                showToast(`📦 ¡Nuevo mes! ${toArchive.length} metas completadas se movieron a tu historial anual.`, "info");
+            }, 1500);
+        }
+
+        // 5. Actualizar el mes de control para que no se repita hasta el próximo mes
+        appData.lastSessionMonth = currentMonth;
+        saveData();
+        updateUI();
+    }
+}
+
+function showArchives() {
+    if (!appData.archives || appData.archives.length === 0) {
+        showToast("Aún no tienes metas archivadas.", "info");
+        return;
+    }
+    
+    console.table(appData.archives); // Por ahora, puedes verlas en la consola
+    // Opcional: Podrías crear un modal que liste appData.archives similar al historial
+    alert(`Tienes ${appData.archives.length} metas guardadas en tu histórico de éxito.`);
+}
 
 window.addEventListener('resize', () => {
     if (myChart) myChart.resize();

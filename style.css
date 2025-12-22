@@ -325,45 +325,68 @@ body {
    9. MINI TARJETAS DE DÉBITO (WALLET)
    ========================================= */
 /* --- ESTILO PROPORCIONAL Y CORREGIDO (V0.26) --- */
+
+/* Contenedor para las tarjetas de Cuentas Digitales */
+.wallet-grid {
+    display: grid;
+    /* Esto crea columnas de mínimo 160px. Si no caben, las pasa abajo solo */
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 15px; /* El espacio "aire" entre tarjetas */
+    padding: 10px 0;
+}
+
 .mini-card {
     width: 100%;
-    /* Corrección: Max width para que no se estiren infinitamente */
-    max-width: 340px; 
-    /* Aspect Ratio para mantener forma de tarjeta real */
-    aspect-ratio: 1.58/1; 
-    /* Centrado en su columna */
-    margin: 0 auto;
-    
+    aspect-ratio: 1.6 / 1; /* Proporción fija */
     border-radius: 16px;
-    padding: 20px;
-    
+    padding: 12px 15px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    
+    overflow: hidden; /* IMPORTANTE: Corta cualquier exceso */
     position: relative;
-    cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border: none;
+}
+
+.mini-card-name {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 65%;
+}
+
+.mini-card-balance {
+    /* Si el número es muy largo, bajará de tamaño automáticamente hasta 0.8rem */
+    font-size: clamp(0.8rem, 2.2vw, 1.25rem); 
+    line-height: 1;
+    white-space: nowrap; /* EVITA QUE EL .00 SE VAYA ABAJO */
+    overflow: hidden;
+    text-overflow: clip; /* O ellipsis si prefieres que se corte con puntos */
+}
+
+/* Ajuste para el botón de Nueva Tarjeta */
+.mini-card-add {
+    background: #f8f9fa !important;
+    border: 2px dashed #dee2e6 !important;
+    color: #adb5bd !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.mini-card-balance {
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+    letter-spacing: -0.5px; /* Hace que el número se vea más compacto y moderno */
 }
 
 .mini-card:hover {
     transform: translateY(-5px);
     box-shadow: 0 12px 24px rgba(0,0,0,0.15) !important;
     z-index: 2;
-}
-
-.mini-card-name {
-    font-size: 0.85rem;
-    white-space: nowrap;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-}
-
-.mini-card-balance {
-    font-size: 1.4rem;
-    line-height: 1;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
 }
 
 .mini-card-add {
@@ -736,6 +759,10 @@ body.privacy-active #total-income-display {
     .main-content { margin-left: 0; width: 100%; padding: 15px; }
 }
 
+@media (max-width: 991.98px) {
+    .income-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* --- style.css --- */
 
 /* Color verde brillante personalizado para que resalte en fondos de colores */
@@ -1011,3 +1038,4 @@ button:focus {
 .transition-all {
     transition: all 0.3s ease-in-out;
 }
+

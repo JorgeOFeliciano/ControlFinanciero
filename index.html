@@ -78,34 +78,33 @@
                 <div class="tab-content">
                     
                     <div class="tab-pane fade show active" id="dashboard">
-                        
-                        <div class="row g-4 mb-4">
-                            <div class="col-md-3">
-                                <div class="kpi-card kpi-danger">
+                        <div class="row g-3 mb-4">
+                            <div class="col-6 col-md-3">
+                                <div class="kpi-card kpi-danger h-100">
                                     <i class="fas fa-credit-card kpi-icon-bg text-danger"></i>
                                     <div class="kpi-label">Deuda Total Tarjetas</div>
                                     <div class="money-display text-danger" id="kpi-debt">$0.00</div>
                                     <small class="text-muted" style="font-size: 0.75rem;">Monto a liquidar</small>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="kpi-card kpi-success">
+                            <div class="col-6 col-md-3">
+                                <div class="kpi-card kpi-success h-100">
                                     <i class="fas fa-check-circle kpi-icon-bg text-success"></i>
                                     <div class="kpi-label">Crédito Disponible</div>
                                     <div class="money-display text-success" id="kpi-available">$0.00</div>
                                     <small class="text-muted" style="font-size: 0.75rem;">Capacidad de compra</small>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="kpi-card kpi-warning">
+                            <div class="col-6 col-md-3">
+                                <div class="kpi-card kpi-warning h-100">
                                     <i class="fas fa-hand-holding-usd kpi-icon-bg text-warning"></i>
                                     <div class="kpi-label">Cuentas por Cobrar</div>
                                     <div class="money-display text-warning" id="kpi-loans">$0.00</div>
                                     <small class="text-muted" style="font-size: 0.75rem;">Dinero pendiente</small>
                                 </div>
                             </div>
-                            <div class="col-md-3">
-                                <div class="kpi-card kpi-primary">
+                            <div class="col-6 col-md-3">
+                                <div class="kpi-card kpi-primary h-100">
                                     <i class="fas fa-wallet kpi-icon-bg text-primary"></i>
                                     <div class="kpi-label">Liquidez Total</div>
                                     <div class="money-display text-primary" id="kpi-assets">$0.00</div>
@@ -114,10 +113,9 @@
                             </div>
                         </div>
 
-
-                        <div class="row g-4">
-                            <div class="col-12">
-                                <div class="card card-custom p-4 h-100 border-0">
+                        <div class="row g-4 mb-4">
+                            <div class="col-lg-8">
+                                <div class="card card-custom p-4 h-100 border-0 shadow-sm">
                                     <div class="d-flex justify-content-between align-items-center mb-4">
                                         <h5 class="fw-bold text-dark mb-0">
                                             <i class="fas fa-chart-pie me-2 text-primary"></i>Distribución de Deuda
@@ -129,180 +127,142 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div class="row mt-4 mb-5">
-                            <div class="col-12">
-                                <div class="card card-custom border-0 shadow-sm overflow-hidden">
+                            <div class="col-lg-4">
+                                <div class="card card-custom border-0 shadow-sm h-100 overflow-hidden">
                                     <div class="card-body p-0">
-                                        <div class="row g-0">
+                                        <div class="col-md-12 p-4 bg-light border-bottom">
+                                            <h6 class="fw-bold text-primary mb-1"><i class="fas fa-history me-2"></i>Proyección de Pagos</h6>
+                                            <small class="text-muted d-block mb-4">Desliza para ver tus pagos futuros</small>
                                             
-                                            <div class="col-md-4 p-4 bg-light border-end">
-                                                <h6 class="fw-bold text-primary mb-1"><i class="fas fa-history me-2"></i>Proyección de Pagos</h6>
-                                                <small class="text-muted d-block mb-4">Desliza para ver tus pagos futuros</small>
-                                                
-                                                <div class="text-center py-3">
-                                                    <h2 class="fw-bold text-dark mb-0" id="proj-month-label">---</h2>
-                                                    <small class="text-success fw-bold" id="proj-total-label">$0.00</small>
-                                                </div>
-
-                                                <div class="mt-4 px-2">
-                                                    <label class="small fw-bold text-muted mb-2 d-flex justify-content-between">
-                                                        <span>Hoy</span>
-                                                        <span id="proj-end-date">Fin de Deuda</span>
-                                                    </label>
-                                                    <input type="range" class="form-range" id="time-slider" min="0" max="0" value="0" step="1" oninput="renderProjectionStep(this.value)">
-                                                </div>
-                                                
-                                                <div class="mt-4 text-center">
-                                                    <small class="text-muted fst-italic" id="proj-freedom-msg">...</small>
-                                                </div>
+                                            <div class="text-center py-3">
+                                                <h2 class="fw-bold text-dark mb-0" id="proj-month-label">---</h2>
+                                                <small class="text-success fw-bold" id="proj-total-label">$0.00</small>
                                             </div>
 
-                                            <div class="col-md-8 p-4">
-                                                <h6 class="fw-bold text-muted small border-bottom pb-2 mb-3">DESGLOSE POR TARJETA</h6>
-                                                
-                                                <div id="proj-details-list" style="height: 220px; overflow-y: auto;">
-                                                    <div class="text-center text-muted py-5 mt-3">
-                                                        <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
-                                                        <p>Calculando futuro...</p>
-                                                    </div>
+                                            <div class="mt-4 px-2">
+                                                <label class="small fw-bold text-muted mb-2 d-flex justify-content-between">
+                                                    <span>Hoy</span>
+                                                    <span id="proj-end-date">Fin de Deuda</span>
+                                                </label>
+                                                <input type="range" class="form-range" id="time-slider" min="0" max="0" value="0" step="1" oninput="renderProjectionStep(this.value)">
+                                            </div>
+                                            
+                                            <div class="mt-4 text-center">
+                                                <small class="text-muted fst-italic" id="proj-freedom-msg">...</small>
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-12 p-4">
+                                            <h6 class="fw-bold text-muted small border-bottom pb-2 mb-3">DESGLOSE POR TARJETA</h6>
+                                            <div id="proj-details-list" style="height: 180px; overflow-y: auto;">
+                                                <div class="text-center text-muted py-5 mt-3">
+                                                    <i class="fas fa-spinner fa-spin fa-2x mb-3"></i>
+                                                    <p>Calculando futuro...</p>
                                                 </div>
                                             </div>
-
                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row g-4 mb-5">
-    
-                            <div class="col-lg-6">
-                                <div class="card card-custom h-100 border-0 shadow-sm">
-                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                        <h6 class="fw-bold text-dark mb-0">
-                                            <i class="fas fa-hand-holding-usd me-2 text-warning"></i>Cuentas por Cobrar
-                                        </h6>
-                                        <span class="badge bg-warning text-dark rounded-pill" id="widget-loans-count">0 Activos</span>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="d-flex align-items-end mb-1">
-                                            <h2 class="fw-bold text-dark mb-0 me-2" id="widget-loans-total">$0.00</h2>
-                                            <small class="text-muted mb-1 font-monospace">PENDIENTE</small>
-                                        </div>
-
-                                        <div class="row g-0 py-3 my-3 border-top border-bottom">
-                                            <div class="col-6 border-end text-center">
-                                                <div class="text-muted mb-1" style="font-size: 0.65rem; font-weight: 800; letter-spacing: 0.5px;">RECUPERADO</div>
-                                                <div class="text-success fw-bold" id="widget-loans-collected" style="font-size: 0.95rem;">$0.00</div>
-                                            </div>
-                                            <div class="col-6 text-center">
-                                                <div class="text-muted mb-1" style="font-size: 0.65rem; font-weight: 800; letter-spacing: 0.5px;">POR COBRAR</div>
-                                                <div class="text-danger fw-bold" id="widget-loans-remaining" style="font-size: 0.95rem;">$0.00</div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div id="widget-loans-list" style="max-height: 180px; overflow-y: auto; padding-right: 5px;">
-                                            </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-lg-6">
-                                <div class="card card-custom h-100 border-0 shadow-sm">
-                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                        <h6 class="fw-bold text-dark mb-0">
-                                            <i class="fas fa-chart-line me-2 text-success"></i>Ingresos del Mes
-                                        </h6>
-                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill border border-success border-opacity-25" id="widget-income-month">...</span>
-                                    </div>
-                                    <div class="card-body">
-                                        <div class="d-flex align-items-end mb-3">
-                                            <h2 class="fw-bold text-success mb-0 me-2" id="widget-income-total">$0.00</h2>
-                                            <small class="text-muted mb-1">acumulado este mes</small>
-                                        </div>
-
-                                        <div id="widget-income-list" style="max-height: 200px; overflow-y: auto;">
-                                            </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="card border-0 shadow-sm mb-4">
-                                <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
-                                    <h6 class="fw-bold mb-0"><i class="fas fa-sync-alt me-2 text-primary"></i>Suscripciones Mensuales</h6>
-                                    <button class="btn btn-sm btn-primary rounded-pill px-3" onclick="openSubscriptionModal()">
-                                        <i class="fas fa-plus me-1"></i>Nueva
-                                    </button>
-                                </div>
-                                <div class="card-body">
-                                    <div id="subscription-list" class="list-group list-group-flush">
-                                        </div>
-                                    <div class="mt-3 pt-2 border-top d-flex justify-content-between">
-                                        <span class="small text-muted">Total Mensual:</span>
-                                        <span id="total-subscriptions" class="fw-bold text-primary">$0.00</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="row g-4 mb-4">
-                            <div class="col-md-6">
-                                <div class="card card-custom h-100 border-0 shadow-sm">
-                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                        <h6 class="fw-bold text-dark mb-0">
-                                            <i class="fas fa-university me-2 text-primary"></i>Distribución en Cuentas
-                                        </h6>
-                                        <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill border border-primary border-opacity-25">Total: <span id="chart-total-debit">$0.00</span></span>
+                            <div class="col-md-6 col-lg-3">
+                                <div class="card card-custom h-100 border-0 shadow-sm p-3 d-flex flex-column align-items-center justify-content-center">
+                                    <h6 class="fw-bold small mb-3 text-muted text-uppercase w-100 text-center">Bancos</h6>
+                                    <div class="chart-pie-wrapper d-flex justify-content-center align-items-center" style="height: 180px; width: 100%; position: relative;">
+                                        <canvas id="debitPieChart"></canvas>
                                     </div>
-                                    <div class="card-body position-relative">
-                                        <div class="chart-pie-wrapper" style="height: 250px; position: relative;">
-                                            <canvas id="debitPieChart"></canvas>
-                                        </div>
+                                    <div class="mt-3 fw-bold text-primary text-center" id="chart-total-debit">$0.00</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-3">
+                                <div class="card card-custom h-100 border-0 shadow-sm p-3 d-flex flex-column align-items-center justify-content-center">
+                                    <h6 class="fw-bold small mb-3 text-muted text-uppercase w-100 text-center">Efectivo</h6>
+                                    <div class="chart-pie-wrapper d-flex justify-content-center align-items-center" style="height: 180px; width: 100%; position: relative;">
+                                        <canvas id="assetPieChart"></canvas>
+                                    </div>
+                                    <div class="mt-3 fw-bold text-success text-center" id="chart-total-assets">$0.00</div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 col-lg-3">
+                                <div class="card card-custom h-100 border-0 shadow-sm p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="fw-bold mb-0 small text-muted text-uppercase"><i class="fas fa-sync-alt me-2 text-primary"></i>Suscripciones</h6>
+                                        <button class="btn btn-sm btn-primary rounded-pill px-2 py-0" onclick="openSubscriptionModal()"><i class="fas fa-plus"></i></button>
+                                    </div>
+                                    <div id="subscription-list" class="list-group list-group-flush overflow-auto small" style="height: 160px;"></div>
+                                    <div class="mt-auto pt-2 border-top d-flex justify-content-between">
+                                        <span class="small text-muted">Total:</span>
+                                        <span id="total-subscriptions" class="fw-bold text-primary">$0.00</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="col-md-6">
-                                <div class="card card-custom h-100 border-0 shadow-sm">
-                                    <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                        <h6 class="fw-bold text-dark mb-0">
-                                            <i class="fas fa-coins me-2 text-success"></i>Distribución de Efectivo
-                                        </h6>
-                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill border border-success border-opacity-25">Total: <span id="chart-total-assets">$0.00</span></span>
+                            <div class="col-md-6 col-lg-3">
+                                <div class="card card-custom h-100 border-0 shadow-sm p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="fw-bold mb-0 small text-muted text-uppercase"><i class="fas fa-piggy-bank me-2 text-primary"></i>Metas</h6>
+                                        <button class="btn btn-sm btn-light rounded-pill px-2 py-0" onclick="openGoalModal()"><i class="fas fa-plus"></i></button>
                                     </div>
-                                    <div class="card-body position-relative">
-                                        <div class="chart-pie-wrapper" style="height: 250px; position: relative;">
-                                            <canvas id="assetPieChart"></canvas>
-                                        </div>
+                                    <div id="savings-goals-list" class="overflow-auto" style="height: 160px;"></div>
+                                    <div id="completed-goals-section" class="mt-2 d-none">
+                                        <hr class="my-2 opacity-25"> 
+                                        <h6 class="text-success small fw-bold text-uppercase mb-2"><i class="fas fa-trophy me-1"></i>Salón de la Fama</h6>
+                                        <div id="completed-goals-list"></div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="col-lg-6 mt-4">
-                            <div class="card card-custom h-100 border-0 shadow-sm">
-                                <div class="card-header bg-white border-bottom-0 pt-4 pb-0 d-flex justify-content-between align-items-center">
-                                    <h6 class="fw-bold text-dark mb-0">
-                                        <i class="fas fa-piggy-bank me-2 text-primary"></i>Metas de Ahorro
-                                    </h6>
-                                    <button class="btn btn-sm btn-light rounded-pill" onclick="openGoalModal()">
-                                        <i class="fas fa-plus"></i>
-                                    </button>
-                                </div>
+                        <div class="row g-4">
+                            <div class="col-lg-6">
+                                <div class="card card-custom border-0 shadow-sm p-4 h-100">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="fw-bold text-dark mb-0"><i class="fas fa-hand-holding-usd me-2 text-warning"></i>Cobranza Pendiente</h6>
+                                        <span class="badge bg-warning text-dark rounded-pill" id="widget-loans-count">0 Activos</span>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-end mb-1">
+                                        <h2 class="fw-bold text-dark mb-0 me-2" id="widget-loans-total">$0.00</h2>
+                                        <small class="text-muted mb-1 font-monospace">PENDIENTE</small>
+                                    </div>
 
-                                <div class="card-body">
-                                    <div id="savings-goals-list">
+                                    <div class="row g-0 py-3 my-3 border-top border-bottom">
+                                        <div class="col-6 border-end text-center">
+                                            <div class="text-muted mb-1" style="font-size: 0.65rem; font-weight: 800;">RECUPERADO</div>
+                                            <div class="text-success fw-bold" id="widget-loans-collected">$0.00</div>
                                         </div>
+                                        <div class="col-6 text-center">
+                                            <div class="text-muted mb-1" style="font-size: 0.65rem; font-weight: 800;">POR COBRAR</div>
+                                            <div class="text-danger fw-bold" id="widget-loans-remaining">$0.00</div>
+                                        </div>
+                                    </div>
 
-                                    <div id="completed-goals-section" class="mt-4 d-none">
-                                        <hr class="my-4 opacity-25"> 
-                                        <h6 class="text-success small fw-bold text-uppercase mb-3">
-                                            <i class="fas fa-trophy me-2"></i>Salón de la Fama
-                                        </h6>
-                                        <div id="completed-goals-list">
-                                            </div>
+                                    <div id="widget-loans-list" style="height: 150px; overflow-y: auto; padding-right: 5px;"></div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="card card-custom border-0 shadow-sm p-4 h-100">
+                                    <div class="card-header bg-white border-bottom-0 p-0 d-flex justify-content-between align-items-center mb-3">
+                                        <h6 class="fw-bold text-success mb-0"><i class="fas fa-chart-line me-2"></i>Ingresos Mensuales</h6>
+                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill border border-success" id="widget-income-month">...</span>
+                                    </div>
+                                    
+                                    <div class="d-flex align-items-end mb-3">
+                                        <h2 class="fw-bold text-success mb-0 me-2" id="widget-income-total">$0.00</h2>
+                                        <small class="text-muted mb-1">acumulado en vista</small>
+                                    </div>
+
+                                    <div id="widget-income-list" style="height: 200px; overflow-y: auto;"></div>
+                                    
+                                    <div class="text-center mt-3 pt-3 border-top">
+                                        <h2 class="text-success fw-bold mb-0" id="total-income-display" style="display:none;">$0.00</h2>
+                                        <small class="text-muted">Gestión de flujo mensual activa</small>
                                     </div>
                                 </div>
                             </div>
@@ -451,84 +411,128 @@
                     </div>
 
                     <div class="tab-pane fade" id="loans">
-                        <div class="row g-4">
+                        <div class="container-fluid p-0">
                             
-                            <div class="col-lg-7 col-xl-8">
-                                
-                                <div class="card card-custom p-4 mb-4 border-0 shadow-sm">
-                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                                        <h5 class="text-danger fw-bold mb-0"><i class="fas fa-hand-holding-usd me-2"></i>Cuentas por Cobrar</h5>
-                                        <button class="btn btn-sm btn-outline-danger rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addLoanModal">+ Nuevo</button>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table align-middle mb-0">
-                                            <thead class="text-muted small text-uppercase"><tr><th>Deudor</th><th class="text-end">Restante</th><th class="text-end">Acción</th></tr></thead>
-                                            <tbody id="loans-body"></tbody>
-                                        </table>
+                            <div class="row g-4 mb-4">
+                                <div class="col-lg-6">
+                                    <div class="card card-custom p-4 h-100 border-0 shadow-sm bg-white">
+                                        <h5 class="text-primary fw-bold mb-4 px-1">
+                                            <i class="fas fa-university me-2"></i>Cuentas Digitales
+                                        </h5>
+                                        <div class="row g-2" id="debit-grid">
+                                            </div>
                                     </div>
                                 </div>
 
-                                <div class="mb-4">
-                                    <h5 class="text-primary fw-bold mb-3 px-1"><i class="fas fa-wallet me-2"></i>Mis Cuentas de Débito</h5>
-                                    <div class="row g-3 justify-content-center" id="debit-grid">
+                                <div class="col-lg-6">
+                                    <div class="card card-custom p-4 h-100 border-0 shadow-sm">
+                                        <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                                            <h5 class="text-success fw-bold mb-0">
+                                                <i class="fas fa-wallet me-2"></i>Efectivo y Activos
+                                            </h5>
+                                            <div class="btn-group">
+                                                <button class="btn btn-sm btn-outline-primary rounded-pill px-2 me-1" onclick="openDepositModal()" title="Depositar a Banco"><i class="fas fa-exchange-alt"></i></button>
+                                                <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="openAssetModal('Cash')">+ Agregar</button>
+                                            </div>
                                         </div>
-                                </div>
-
-                                <div class="card card-custom p-4 border-0 shadow-sm">
-                                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                                        <h5 class="text-success fw-bold mb-0"><i class="fas fa-money-bill-wave me-2"></i>Efectivo y Activos</h5>
-                                        <div>
-                                            <button class="btn btn-sm btn-outline-primary rounded-pill px-2 me-1" onclick="openDepositModal()" title="Depositar a Banco"><i class="fas fa-exchange-alt"></i></button>
-                                            <button class="btn btn-sm btn-outline-success rounded-pill px-3" onclick="openAssetModal('Cash')">+ Agregar</button>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle mb-0">
+                                                <thead class="text-muted small text-uppercase">
+                                                    <tr><th>Concepto</th><th class="text-end">Monto</th><th class="text-end"></th></tr>
+                                                </thead>
+                                                <tbody id="assets-body"></tbody>
+                                            </table>
                                         </div>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table align-middle mb-0">
-                                            <thead class="text-muted small text-uppercase"><tr><th>Concepto</th><th class="text-end">Monto</th><th class="text-end"></th></tr></thead>
-                                            <tbody id="assets-body"></tbody>
-                                        </table>
-                                    </div>
-                                    <div class="mt-3 p-3 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 d-flex justify-content-between align-items-center">
-                                        <span class="text-success fw-bold text-uppercase small">Total Disponible</span>
-                                        <span class="fs-4 fw-bold text-success" id="total-assets-sum">$0.00</span>
+                                        <div class="mt-auto pt-3 border-top">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="text-muted small fw-bold">TOTAL FÍSICO:</span>
+                                                <span class="fs-4 fw-bold text-success" id="total-assets-sum">$0.00</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div class="col-lg-5 col-xl-4">
-                                <div class="card card-custom p-4 h-100 border-0 shadow-sm">
-                                    <div class="d-flex justify-content-between align-items-center mb-4">
-                                        <h5 class="text-primary fw-bold mb-0"><i class="fas fa-calendar-alt me-2"></i>Ingresos</h5>
-                                        <div class="d-flex align-items-center gap-2 bg-light rounded-pill px-2 py-1 border">
-                                            <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
-                                            <span class="badge bg-success" id="month-label" style="min-width: 100px;">Mes Actual</span>
-                                            <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+
+                            <div class="row g-4 mb-4">
+                                <div class="col-12">
+                                    <div class="card card-custom p-4 border-0 shadow-sm bg-white">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h5 class="text-danger fw-bold mb-0">
+                                                <i class="fas fa-hand-holding-usd me-2"></i>Cuentas por Cobrar (Préstamos)
+                                            </h5>
+                                            <button class="btn btn-sm btn-danger rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#addLoanModal">
+                                                <i class="fas fa-plus me-1"></i> Nuevo Deudor
+                                            </button>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-hover align-middle mb-0">
+                                                <thead class="bg-light small text-uppercase text-muted">
+                                                    <tr>
+                                                        <th class="ps-3">Deudor</th>
+                                                        <th class="text-end">Monto Pendiente</th>
+                                                        <th class="text-end pe-3">Acciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="loans-body"></tbody>
+                                            </table>
                                         </div>
                                     </div>
-                                    
-                                    <div class="calendar-wrapper mb-4">
-                                        <div class="calendar-header-row mb-2 d-flex justify-content-between text-muted small fw-bold text-center">
-                                            <div style="width:14%">L</div><div style="width:14%">M</div><div style="width:14%">M</div><div style="width:14%">J</div><div style="width:14%">V</div><div style="width:14%">S</div><div class="text-success" style="width:14%">D</div>
+                                </div>
+                            </div>
+
+                            <div class="row g-4">
+                                <div class="col-12">
+                                    <div class="card card-custom p-4 border-0 shadow-sm border-top border-primary border-4">
+                                        <div class="d-flex justify-content-between align-items-center mb-4">
+                                            <div>
+                                                <h5 class="text-primary fw-bold mb-1">
+                                                    <i class="fas fa-calendar-check me-2"></i>Registro de Ingresos Detallado
+                                                </h5>
+                                                <small class="text-muted">Control de flujo mensual y calendario de entradas</small>
+                                            </div>
+                                            <div class="d-flex align-items-center gap-2 bg-light rounded-pill px-3 py-2 border shadow-sm">
+                                                <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(-1)"><i class="fas fa-chevron-left"></i></button>
+                                                <span class="badge bg-primary px-4 py-2 fs-6" id="month-label" style="min-width: 150px;">Mes Actual</span>
+                                                <button class="btn btn-sm btn-icon-nav" onclick="changeMonth(1)"><i class="fas fa-chevron-right"></i></button>
+                                            </div>
                                         </div>
-                                        <div id="calendar-days" class="calendar-grid"></div>
-                                    </div>
-                                    
-                                    <h6 class="fw-bold border-bottom pb-2 mb-3 small text-muted">HISTORIAL DEL MES</h6>
-                                    <div style="height: 250px; overflow-y: auto;">
-                                        <table class="table table-sm table-borderless small mb-0 align-middle">
-                                            <tbody id="income-list-body"></tbody>
-                                        </table>
-                                    </div>
-                                    <div class="text-center mt-3 pt-3 border-top">
-                                        <h2 class="text-success fw-bold mb-0" id="total-income-display">$0.00</h2>
-                                        <small class="text-muted">Total Ingresos Visualizados</small>
+                                        
+                                        <div class="row g-5">
+                                            <div class="col-xl-5 col-lg-6 border-end">
+                                                <div class="calendar-wrapper p-2">
+                                                    <div class="calendar-header-row mb-3 d-flex justify-content-between text-muted small fw-bold text-center">
+                                                        <div style="width:14%">LUN</div><div style="width:14%">MAR</div><div style="width:14%">MIÉ</div><div style="width:14%">JUE</div><div style="width:14%">VIE</div><div style="width:14%">SÁB</div><div class="text-danger" style="width:14%">DOM</div>
+                                                    </div>
+                                                    <div id="calendar-days" class="calendar-grid"></div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div class="col-xl-7 col-lg-6">
+                                                <h6 class="fw-bold small text-muted text-uppercase mb-3 d-flex justify-content-between">
+                                                    <span>Historial de Movimientos</span>
+                                                    <i class="fas fa-list-ul"></i>
+                                                </h6>
+                                                <div style="height: 300px; overflow-y: auto; padding-right: 10px;">
+                                                    <table class="table table-sm table-borderless align-middle">
+                                                        <tbody id="income-list-body">
+                                                            </tbody>
+                                                    </table>
+                                                </div>
+                                                <div class="mt-4 p-3 bg-primary bg-opacity-10 rounded-4 border border-primary border-opacity-25 d-flex justify-content-between align-items-center">
+                                                    <div>
+                                                        <small class="text-primary fw-bold text-uppercase d-block" style="font-size: 0.65rem; letter-spacing: 1px;">Ingresos Totales del Mes</small>
+                                                        <span class="text-muted small">Datos actualizados en tiempo real</span>
+                                                    </div>
+                                                    <h2 class="text-primary fw-bold mb-0" id="total-income-display">$0.00</h2>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
                         </div>
                     </div>
-
                 </div> </div>
         </main>
     </div>
