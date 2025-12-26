@@ -216,6 +216,8 @@
                                     </div>
                                 </div>
                             </div>
+
+                            
                         </div>
 
                         <div class="row g-4">
@@ -263,6 +265,29 @@
                                     <div class="text-center mt-3 pt-3 border-top">
                                         <h2 class="text-success fw-bold mb-0" id="total-income-display" style="display:none;">$0.00</h2>
                                         <small class="text-muted">Gestión de flujo mensual activa</small>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row g-4 mt-2">
+                                <div class="col-lg-7">
+                                    <div class="card card-custom p-4 bg-white h-100 shadow-sm border-0">
+                                        <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-chart-bar me-2"></i>Balance del Mes</h6>
+                                        <div style="height: 300px; position: relative;">
+                                            <canvas id="balanceChart"></canvas>
+                                        </div>
+                                        <div style="height: 220px; position: relative;">
+                                            <canvas id="balanceChart"></canvas>
+                                        </div>
+                                        <div id="net-balance-summary" class="text-center mt-3 p-2 bg-light rounded-3 border shadow-sm"></div>
+                                    </div>
+                                </div>
+
+                                <div class="col-lg-5">
+                                    <div class="card card-custom p-4 bg-white h-100 shadow-sm border-0">
+                                        <h6 class="fw-bold mb-3 text-primary"><i class="fas fa-bullseye me-2"></i>Presupuesto vs Real</h6>
+                                        <div id="budget-progress-container" class="pe-2" style="max-height: 300px; overflow-y: auto;">
+                                            </div>
                                     </div>
                                 </div>
                             </div>
@@ -533,6 +558,8 @@
 
                         </div>
                     </div>
+
+                    
                 </div> </div>
         </main>
     </div>
@@ -717,6 +744,12 @@
 
                     <label class="small fw-bold text-muted mb-1">Nombre</label>
                     <input type="text" id="new-source-name" class="form-control mb-3" placeholder="Ej. Cripto, Rentas..." oninput="updateSourcePreview()">
+
+                    <label class="small fw-bold text-muted mb-1">Presupuesto Mensual (Opcional)</label>
+                    <div class="input-group mb-3 shadow-sm">
+                        <span class="input-group-text bg-light border-end-0 text-muted small">$</span>
+                        <input type="number" id="new-source-limit" class="form-control border-start-0" placeholder="Ej. 3000">
+                    </div>
 
                     <label class="small fw-bold text-muted mb-1">Icono</label>
                     <div class="d-flex gap-2 justify-content-between mb-3 overflow-auto pb-2" id="icon-selector-container">
@@ -1484,6 +1517,7 @@
             </div>
         </div>
     </div>
+    
     <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
         <div id="liveToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex"><div class="toast-body fw-bold" id="toast-msg"></div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>

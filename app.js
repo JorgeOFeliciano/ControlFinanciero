@@ -23,13 +23,13 @@ const defaultData = {
         { id: 'other', label: 'Otro', icon: 'fa-piggy-bank', color: '#343a40' }
     ],
     // AÑADIR ESTO:
-    // Dentro de defaultData o appData
     expenseSources: [
-        { id: 'food', label: 'Comida', icon: 'fa-utensils', color: '#ff4757' },
-        { id: 'transport', label: 'Transporte', icon: 'fa-car', color: '#3742fa' },
-        { id: 'services', label: 'Servicios', icon: 'fa-bolt', color: '#ffa502' },
-        { id: 'health', label: 'Salud', icon: 'fa-heartbeat', color: '#ff6b81' },
-        { id: 'other_exp', label: 'Otro', icon: 'fa-shopping-bag', color: '#747d8c' }
+        { id: 'food', label: 'Comida', icon: 'fa-utensils', color: '#ff4757', limit: 3000 },
+        { id: 'transport', label: 'Transporte', icon: 'fa-car', color: '#3742fa', limit: 1000 },
+        { id: 'services', label: 'Servicios', icon: 'fa-bolt', color: '#ffa502', limit: 2500 },
+        { id: 'health', label: 'Salud', icon: 'fa-heartbeat', color: '#ff6b81', limit: 1500 },
+        { id: 'other_exp', label: 'Otro', icon: 'fa-shopping-bag', color: '#747d8c', limit: 500 },
+        { id: 'exp_subs', label: 'Suscripciones', icon: 'fa-sync-alt', color: '#6f42c1', limit: 1000 },
     ],
 
     subscriptions: [
@@ -102,12 +102,15 @@ const incomeConfig = {
 
 let appData = JSON.parse(JSON.stringify(defaultData));
 let myChart = null;
+let globalProjection = []; // <--- ESTA LÍNEA ES VITAL
+let balanceChartInstance = null;
 let calendarViewDate = new Date();
 let depositoPendiente = null;
 let pendingActionCallback = null;
 let editingGoalIdx = null;
 let extraMonthlySim = 0;
 let tempSimValue = 0;
+
 
 const fmt = (n) => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
 
@@ -208,11 +211,20 @@ document.addEventListener('DOMContentLoaded', () => {
 // --- SISTEMA DE LOGS ---
 function addLog(tipo, mensaje, monto) {
     if (!appData.history) appData.history = [];
-    const fecha = new Date().toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-    appData.history.unshift({ date: fecha, type: tipo, msg: mensaje, amount: monto });
-    if (appData.history.length > 50) appData.history.pop();
+    const ahora = new Date();
+    const fechaTexto = ahora.toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    
+    // Guardamos la fecha texto para la UI y el timestamp para los cálculos
+    appData.history.unshift({ 
+        date: fechaTexto, 
+        timestamp: ahora.getTime(), // <--- ESTO ES LO QUE PERMITE FILTRAR
+        type: tipo, 
+        msg: mensaje, 
+        amount: monto 
+    });
+    
+    if (appData.history.length > 100) appData.history.pop();
 }
-
 function openHistoryModal() {
     const listBody = document.getElementById('history-list-body');
     listBody.innerHTML = '';
@@ -642,6 +654,19 @@ function updateUI() {
         il.innerHTML += `<tr style="border-bottom: 1px solid #f0f0f0;"><td class="py-2"><div class="d-flex align-items-center"><div class="rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 32px; height: 32px; background-color: ${cfg.color}20; color: ${cfg.color};"><i class="fas ${cfg.icon} small"></i></div><div><div class="fw-bold text-dark small">${cfg.label}</div><div class="text-muted" style="font-size: 0.7rem;">${dayStr} de ${document.getElementById('month-label').innerText.split(' ')[0]}</div></div></div></td><td class="text-end fw-bold text-success py-2">${fmt(inc.amount)}</td></tr>`;
     });
 
+    const totalIncomeView = appData.incomes
+        .filter(inc => {
+            const d = new Date(inc.date + 'T00:00:00');
+            return d.getMonth() === calendarViewDate.getMonth() && d.getFullYear() === calendarViewDate.getFullYear();
+        })
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+    const kpiInc = document.getElementById('total-income-display');
+    if (kpiInc) kpiInc.innerText = fmt(totalIncomeView);
+    
+    const widgetInc = document.getElementById('widget-income-total');
+    if (widgetInc) widgetInc.innerText = fmt(totalIncomeView);
+
     // KPIs
     document.getElementById('kpi-debt').innerText = fmt(tDebt);
     document.getElementById('kpi-available').innerText = fmt(tLimit - tDebt);
@@ -662,6 +687,7 @@ function updateUI() {
     updateChart();
     initProjectionWidget();
     updateLiquidityCharts();
+    updateBudgetAndBalanceUI();
 }
 
 function updateChart() {
@@ -1058,6 +1084,7 @@ function deleteFromEdit() {
 }
 
 function delItem(type, idx) { document.getElementById('del-type').value = type; document.getElementById('del-idx').value = idx; new bootstrap.Modal(document.getElementById('deleteModal')).show(); }
+
 function confirmDelete() {
     const type = document.getElementById('del-type').value;
     const idx = parseInt(document.getElementById('del-idx').value);
@@ -1070,6 +1097,7 @@ function confirmDelete() {
 
 // --- CALENDARIO ---
 function changeMonth(n) { calendarViewDate.setMonth(calendarViewDate.getMonth() + n); updateUI(); }
+
 function renderCalendar() {
     const y = calendarViewDate.getFullYear();
     const m = calendarViewDate.getMonth();
@@ -1126,6 +1154,10 @@ function renderCalendar() {
         g.innerHTML += `<div class="calendar-day" style="${styles}" onclick="dateClick('${iso}')">${content}</div>`;
     }
 }
+/**
+ * Gestiona el evento de clic en un día del calendario.
+ * Prepara los selectores con sugerencias inteligentes y carga la agenda del día.
+ */
 function dateClick(dateStr) {
     document.getElementById('cal-modal-date').value = dateStr;
     const dateObj = new Date(dateStr + 'T00:00:00');
@@ -1136,98 +1168,57 @@ function dateClick(dateStr) {
         weekday: 'long', day: 'numeric', month: 'long' 
     });
 
-    // 1. Llenar Selectores (Ingreso y Gasto) - Incluyendo Tarjetas de Crédito
     const targetSelect = document.getElementById('cal-target-account');
     const sourceSelect = document.getElementById('cal-expense-source');
     
-    [targetSelect, sourceSelect].forEach(sel => {
-        if (!sel) return;
-        sel.innerHTML = '';
-        
-        // Grupo: Bancos (Débito)
-        const gDeb = document.createElement('optgroup'); gDeb.label = "Cuentas de Débito";
-        appData.debit.forEach((d, i) => gDeb.appendChild(new Option(d.name, `debit_${i}`)));
-        
-        // Grupo: Tarjetas de Crédito (NUEVO)
-        const gCred = document.createElement('optgroup'); gCred.label = "Tarjetas de Crédito";
-        appData.cards.forEach((c, i) => gCred.appendChild(new Option(c.name, `card_${i}`)));
-        
-        // Grupo: Efectivo
-        const gAss = document.createElement('optgroup'); gAss.label = "Efectivo / Activos";
-        appData.assets.forEach((a, i) => gAss.appendChild(new Option(a.name, `asset_${i}`)));
-        
-        sel.add(gDeb); sel.add(gCred); sel.add(gAss);
-    });
+    if (targetSelect && sourceSelect) {
+        [targetSelect, sourceSelect].forEach(sel => sel.innerHTML = '');
+        let bestAccount = { id: '', balance: -Infinity };
 
-    // 2. Cargar Ingreso Existente
+        // 1. Cargar Débito y rastrear el mayor saldo
+        const gDeb = document.createElement('optgroup'); gDeb.label = "Cuentas de Débito";
+        appData.debit.forEach((d, i) => {
+            const val = `debit_${i}`;
+            gDeb.appendChild(new Option(`${d.name} (${fmt(d.balance)})`, val));
+            if (d.balance > bestAccount.balance) bestAccount = { id: val, balance: d.balance };
+        });
+
+        // 2. Cargar Crédito (Mostrando disponible)
+        const gCred = document.createElement('optgroup'); gCred.label = "Tarjetas de Crédito";
+        appData.cards.forEach((c, i) => {
+            const status = calcCard(c);
+            gCred.appendChild(new Option(`${c.name} (Disp: ${fmt(status.avail)})`, `card_${i}`));
+        });
+
+        // 3. Cargar Efectivo y comparar con el mayor saldo
+        const gAss = document.createElement('optgroup'); gAss.label = "Efectivo / Activos";
+        appData.assets.forEach((a, i) => {
+            const val = `asset_${i}`;
+            gAss.appendChild(new Option(`${a.name} (${fmt(a.amount)})`, val));
+            if (a.amount > bestAccount.balance) bestAccount = { id: val, balance: a.amount };
+        });
+
+        [targetSelect, sourceSelect].forEach(sel => {
+            sel.add(gDeb.cloneNode(true)); sel.add(gCred.cloneNode(true)); sel.add(gAss.cloneNode(true));
+        });
+
+        // ASISTENTE INTELIGENTE: Pre-seleccionar la cuenta con más liquidez
+        if (bestAccount.id) sourceSelect.value = bestAccount.id;
+    }
+
+    // Cargar datos existentes si los hay
     const existing = appData.incomes.find(x => x.date === dateStr);
     if (existing) {
         document.getElementById('cal-modal-amount').value = existing.amount;
-        document.getElementById('cal-old-amount').value = existing.amount;
-        document.getElementById('cal-old-link').value = existing.linkedAccount || "";
-        if (existing.linkedAccount) targetSelect.value = existing.linkedAccount;
         renderIncomeOptions(existing.type);
-        document.getElementById('btn-delete-income').classList.remove('d-none');
     } else {
         document.getElementById('cal-modal-amount').value = '';
-        document.getElementById('cal-old-amount').value = "0";
-        document.getElementById('cal-old-link').value = "";
         renderIncomeOptions();
-        document.getElementById('btn-delete-income').classList.add('d-none');
     }
 
-    // 3. Llenar la pestaña de AGENDA (Suscripciones + Fechas de Corte)
-    const agendaList = document.getElementById('cal-agenda-list');
-    if (agendaList) {
-        agendaList.innerHTML = '';
-        
-        // Buscar Suscripciones que caen este día y verificar si usan tarjeta
-        const daySubs = (appData.subscriptions || []).filter(s => parseInt(s.payDay) === day);
-        daySubs.forEach(s => {
-            let cardInfo = "";
-            // Si la suscripción está ligada a una tarjeta (card_X)
-            if (s.linkedAccount && s.linkedAccount.startsWith('card_')) {
-                const cardIdx = s.linkedAccount.split('_')[1];
-                const card = appData.cards[cardIdx];
-                if (card) {
-                    const dates = getCardDates(card);
-                    cardInfo = `<div class="text-info mt-1" style="font-size:0.65rem;">
-                                    <i class="fas fa-credit-card me-1"></i>Paga con ${card.name} (Corte: día ${dates.displayCutoff.getDate()})
-                                </div>`;
-                }
-            }
-
-            agendaList.innerHTML += `
-                <div class="border-bottom py-2">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold"><i class="fas ${s.icon || 'fa-tag'} text-primary me-2"></i>${s.name}</span>
-                        <span class="fw-bold text-danger">${fmt(s.amount)}</span>
-                    </div>
-                    ${cardInfo}
-                </div>`;
-        });
-
-        // Buscar Fechas de Tarjetas (Corte y Pago)
-        appData.cards.forEach(c => {
-            const dates = getCardDates(c);
-            if (dates.displayCutoff.getDate() === day && dates.displayCutoff.getMonth() === month) {
-                agendaList.innerHTML += `<div class="py-2 text-primary fw-bold border-bottom small"><i class="fas fa-cut me-2"></i>Fecha de Corte: ${c.name}</div>`;
-            }
-            if (dates.displayLimit.getDate() === day && dates.displayLimit.getMonth() === month) {
-                agendaList.innerHTML += `<div class="py-2 text-danger fw-bold border-bottom small"><i class="fas fa-exclamation-triangle me-2"></i>Límite Pago: ${c.name}</div>`;
-            }
-        });
-
-        if (agendaList.innerHTML === '') agendaList.innerHTML = '<div class="text-center text-muted py-3">No hay eventos para este día.</div>';
-    }
-
-    // 4. Inicializar categorías de gasto
-    if (typeof renderExpenseOptions === 'function') renderExpenseOptions();
-
-    // 5. Mostrar Modal
+    renderExpenseOptions();
     new bootstrap.Modal(document.getElementById('calendarModal')).show();
 }
-
 function renderIncomeOptions(selectedId = null) {
     const container = document.getElementById('income-options-container');
     if (!container) return;
@@ -1475,16 +1466,15 @@ let currentManagerType = 'income'; // Controla si es Ingreso o Egreso
 
 function openSourceManager(type = 'income') {
     currentManagerType = type;
-    
-    // 1. Configurar interfaz del modal
     document.getElementById('source-manager-title').innerText = type === 'income' ? 'Nueva Fuente de Ingreso' : 'Nueva Categoría de Gasto';
     document.getElementById('new-source-name').value = '';
     
-    // 2. Resetear a valores por defecto
+    // LÍNEA A AÑADIR: Limpiar el campo de límite
+    document.getElementById('new-source-limit').value = '';
+    
     setSourceIcon('fa-briefcase');
     document.getElementById('sc_green').checked = true;
     
-    // 3. Cerrar calendario y abrir manager
     const calModal = bootstrap.Modal.getInstance(document.getElementById('calendarModal'));
     if (calModal) calModal.hide();
     
@@ -1547,16 +1537,17 @@ function saveNewSource() {
     const name = document.getElementById('new-source-name').value.trim();
     const icon = document.getElementById('new-source-icon').value;
     const color = document.querySelector('input[name="source-color"]:checked').value;
+    
+    // CAPTURAR EL LÍMITE:
+    const limit = parseFloat(document.getElementById('new-source-limit').value) || 0;
 
     if (!name) { alert("Ingresa un nombre"); return; }
 
-    // --- VALIDACIÓN DE DUPLICADOS ---
-    // Selecciona la lista activa según el tipo de manager abierto (Ingreso o Gasto)
     const listToSearch = currentManagerType === 'income' ? appData.incomeSources : appData.expenseSources;
     const isDuplicate = listToSearch.some(s => s.label.toLowerCase() === name.toLowerCase());
 
     if (isDuplicate) {
-        alert(`La categoría "${name}" ya existe. Intenta con otro nombre para mantener tu base de datos limpia.`);
+        alert(`La categoría "${name}" ya existe.`);
         return;
     }
 
@@ -1564,10 +1555,10 @@ function saveNewSource() {
         id: (currentManagerType === 'income' ? 'inc_' : 'exp_') + Date.now(),
         label: name,
         icon: icon,
-        color: color
+        color: color,
+        limit: limit // SE GUARDA EL LÍMITE AQUÍ
     };
 
-    // Guardar en el array correspondiente
     if (currentManagerType === 'income') {
         appData.incomeSources.push(newCategory);
     } else {
@@ -1578,9 +1569,9 @@ function saveNewSource() {
     saveData();
     bootstrap.Modal.getInstance(document.getElementById('manageSourceModal')).hide();
     
-    // Regresar al calendario y refrescar la vista
-    dateClick(document.getElementById('cal-modal-date').value);
-    showToast("Categoría creada con éxito");
+    // REFRESCAR TODO:
+    updateUI(); 
+    showToast(`Categoría "${name}" creada con éxito`);
 }
 
 // Reemplazo de funciones de eliminar para que sean simétricas
@@ -2058,7 +2049,26 @@ function downloadBackup() { const a = document.createElement('a'); a.href = "dat
 function openRestoreModal() { document.getElementById('backup-file-input').value=''; new bootstrap.Modal(document.getElementById('restoreBackupModal')).show(); }
 function processRestoreFile() { const f = document.getElementById('backup-file-input').files[0]; if(f) { const r = new FileReader(); r.onload=e=>{ appData=JSON.parse(e.target.result); saveData(); updateUI(); bootstrap.Modal.getInstance(document.getElementById('restoreBackupModal')).hide(); }; r.readAsText(f); } }
 function saveData() { localStorage.setItem('finanzasApp_Split_v1', JSON.stringify(appData)); }
-function loadData() { const s = localStorage.getItem('finanzasApp_Split_v1'); if(s) appData = JSON.parse(s); }
+function loadData() {
+    const saved = localStorage.getItem('finanzasApp_Split_v1');
+    if (saved) {
+        const parsed = JSON.parse(saved);
+        appData = { ...defaultData, ...parsed };
+        
+        // Sincronización de límites para asegurar que 'Suscripciones' tenga sus $1,000
+        appData.expenseSources.forEach(src => {
+            const def = defaultData.expenseSources.find(d => d.id === src.id);
+            if (def && (src.limit === undefined || src.limit === null)) src.limit = def.limit;
+        });
+
+        // Asegurar que registros viejos funcionen con el filtro de tiempo
+        if (appData.history) {
+            appData.history.forEach(log => {
+                if (!log.timestamp) log.timestamp = new Date().getTime();
+            });
+        }
+    }
+}
 function shakeModal(el) { const c = el.querySelector('.modal-content'); c.classList.add('modal-shake'); setTimeout(()=>c.classList.remove('modal-shake'),500); }
 function removeErrorVisuals(c) { c.classList.remove('modal-shake'); const m = c.querySelector('.error-msg-inline'); if(m) m.style.display='none'; }
 
@@ -2482,10 +2492,18 @@ function paySubscription(idx) {
             // 1. Asegurar categoría de gasto para el reporte
             if (!appData.expenseSources) appData.expenseSources = [];
             let subCategory = appData.expenseSources.find(c => c.label === 'Suscripciones');
+
             if (!subCategory) {
-                subCategory = { id: 'exp_subs', label: 'Suscripciones', icon: 'fa-sync', color: '#6f42c1' };
+                subCategory = { 
+                    id: 'exp_subs', 
+                    label: 'Suscripciones', 
+                    icon: 'fa-sync-alt', 
+                    color: '#6f42c1', 
+                    limit: 1000 // <--- AHORA SÍ TIENE LÍMITE Y APARECERÁ EN LA LISTA
+                };
                 appData.expenseSources.push(subCategory);
             }
+            // ... resto de la función ...
 
             let success = false;
             let accountName = "";
@@ -2541,7 +2559,23 @@ function paySubscription(idx) {
         "Sí, pagar",  // Texto personalizado para el botón
         "btn-success" // Color verde para la confirmación de pago
     );
-}z
+}
+
+function fixMissingLimits() {
+    appData.expenseSources.forEach(src => {
+        if (src.limit === undefined || src.limit === null || src.limit === 0) {
+            // Si es suscripciones y no tiene límite, le ponemos 1000 por defecto
+            if (src.label === 'Suscripciones') {
+                src.limit = 1000;
+            } else {
+                const defaultSrc = defaultData.expenseSources.find(d => d.id === src.id);
+                src.limit = defaultSrc ? defaultSrc.limit : 0;
+            }
+        }
+    });
+    saveData();
+    updateUI();
+}
 /**
  * Prepara el modal para añadir nuevas suscripciones
  */
@@ -3134,6 +3168,207 @@ function showArchives() {
     alert(`Tienes ${appData.archives.length} metas guardadas en tu histórico de éxito.`);
 }
 
+function updateBudgetAndBalanceUI() {
+    try {
+        const viewDate = calendarViewDate || new Date(); 
+        const m = viewDate.getMonth();
+        const y = viewDate.getFullYear();
+
+        let totalInc = 0;
+        let totalExp = 0;
+        let expensesByCategory = {};
+
+        // 1. Cálculos de Ingresos y Gastos (Mantenemos tu lógica de filtrado por mes)
+        appData.incomes.forEach(inc => {
+            const d = new Date(inc.date + 'T00:00:00');
+            if (d.getMonth() === m && d.getFullYear() === y) totalInc += inc.amount;
+        });
+
+        appData.history.forEach(log => {
+            if (log.type === 'pago' && log.timestamp) {
+                const d = new Date(log.timestamp);
+                if (d.getMonth() === m && d.getFullYear() === y) {
+                    totalExp += log.amount;
+                    if (!log.msg.toLowerCase().includes('suscripción')) {
+                        appData.expenseSources.forEach(src => {
+                            if (log.msg.toLowerCase().includes(src.label.toLowerCase())) {
+                                expensesByCategory[src.id] = (expensesByCategory[src.id] || 0) + log.amount;
+                            }
+                        });
+                    }
+                }
+            }
+        });
+
+        const totalSubsActual = appData.subscriptions.filter(s => s.active).reduce((sum, s) => sum + s.amount, 0);
+        expensesByCategory['exp_subs'] = (expensesByCategory['exp_subs'] || 0) + totalSubsActual;
+
+        // --- CÁLCULO DEL KPI DE AHORRO ---
+        const savingAmount = totalInc - totalExp;
+        const savingPct = totalInc > 0 ? Math.round((savingAmount / totalInc) * 100) : 0;
+        const displayPct = savingPct > 0 ? `${savingPct}%` : '0%';
+        const kpiColor = savingPct >= 20 ? '#11998e' : (savingPct > 0 ? '#ffa502' : '#ff4757');
+        // 4. RENDER BARRAS (Límite Fijo vs Real)
+        const container = document.getElementById('budget-progress-container');
+        if (container) {
+            container.innerHTML = '';
+            appData.expenseSources.filter(s => s.limit > 0).forEach(src => {
+                const spent = expensesByCategory[src.id] || 0;
+                const percent = Math.min((spent / src.limit) * 100, 100);
+                let barClass = percent >= 100 ? 'bg-danger animate__animated animate__pulse animate__infinite' : (percent >= 80 ? 'bg-warning' : 'bg-primary');
+
+                container.innerHTML += `
+                    <div class="mb-3 group-budget-item">
+                        <div class="d-flex justify-content-between mb-1" style="font-size: 0.7rem;">
+                            <span class="fw-bold text-dark">
+                                <i class="fas ${src.icon} me-1" style="color:${src.color}"></i> ${src.label}
+                                <i class="fas fa-pen ms-2 text-muted opacity-50 btn-edit-limit" 
+                                   onclick="openQuickLimitEditor('${src.id}')"></i>
+                            </span>
+                            <span class="text-muted">${fmt(spent)} / <b>${fmt(src.limit)}</b></span>
+                        </div>
+                        <div class="progress" style="height: 6px; border-radius: 10px;">
+                            <div class="progress-bar ${barClass}" style="width: ${percent}%"></div>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        // 5. GRÁFICA DE DONA (Sincronizada con el mes)
+        const ctx = document.getElementById('balanceChart');
+        if (ctx) {
+            if (balanceChartInstance) balanceChartInstance.destroy();
+            
+            const hasData = totalInc > 0 || totalExp > 0;
+
+            balanceChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Ingresos', 'Gastos'],
+                    datasets: [{
+                        data: hasData ? [totalInc, totalExp] : [1, 1],
+                        backgroundColor: hasData ? ['#11998e', '#ff4757'] : ['#e9ecef', '#dee2e6'],
+                        borderWidth: 0,
+                        cutout: '80%' // Dona más delgada para que quepa el texto
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15 } },
+                        tooltip: { enabled: hasData }
+                    }
+                },
+                // PLUGIN PARA DIBUJAR EL % EN EL CENTRO
+                plugins: [{
+                    id: 'centerText',
+                    beforeDraw: (chart) => {
+                        const { width, height, ctx } = chart;
+                        ctx.restore();
+                        
+                        // Configuración del texto principal (%)
+                        const fontSize = (height / 110).toFixed(2);
+                        ctx.font = `bold ${fontSize}em sans-serif`;
+                        ctx.textBaseline = "middle";
+                        ctx.fillStyle = kpiColor;
+
+                        const text = displayPct;
+                        const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                        const textY = height / 2.1; // Ajuste leve hacia arriba
+
+                        ctx.fillText(text, textX, textY);
+
+                        // Subtexto (Palabra "Ahorrado")
+                        const subFontSize = (height / 280).toFixed(2);
+                        ctx.font = `${subFontSize}em sans-serif`;
+                        ctx.fillStyle = "#6c757d";
+                        const subText = "Ahorrado";
+                        const subTextX = Math.round((width - ctx.measureText(subText).width) / 2);
+                        const subTextY = height / 1.7;
+
+                        ctx.fillText(subText, subTextX, subTextY);
+                        ctx.save();
+                    }
+                }]
+            });
+        }
+    } catch (e) { console.error("Error en Dashboard:", e); }
+}
+/**
+ * Abre un diálogo rápido para editar el límite de una categoría específica
+ */
+function openQuickLimitEditor(categoryId) {
+    const category = appData.expenseSources.find(s => s.id === categoryId);
+    if (!category) return;
+
+    // Usamos el sistema de confirmación que ya tienes para que se vea profesional
+    const htmlInput = `
+        <div class="text-center mb-3">
+            <div class="rounded-circle d-inline-flex align-items-center justify-content-center mb-2" 
+                 style="width:50px; height:50px; background:${category.color}20; color:${category.color}">
+                <i class="fas ${category.icon} fa-lg"></i>
+            </div>
+            <h6 class="fw-bold">${category.label}</h6>
+            <p class="small text-muted">Define tu nuevo límite mensual para esta categoría.</p>
+        </div>
+        <div class="input-group mb-2">
+            <span class="input-group-text bg-white border-end-0">$</span>
+            <input type="number" id="quick-limit-val" class="form-control border-start-0 fw-bold" 
+                   value="${category.limit}" placeholder="0.00" autofocus>
+        </div>
+    `;
+
+    askConfirmation(
+        htmlInput,
+        () => {
+            const newLimit = parseFloat(document.getElementById('quick-limit-val').value);
+            if (!isNaN(newLimit) && newLimit >= 0) {
+                category.limit = newLimit;
+                saveData();
+                updateUI(); // Refresca las barras y la gráfica automáticamente
+                showToast(`Límite de ${category.label} actualizado a ${fmt(newLimit)}`);
+            }
+        },
+        "Guardar Presupuesto",
+        "btn-primary"
+    );
+    
+    // Enfocar el input automáticamente al abrir
+    setTimeout(() => document.getElementById('quick-limit-val').select(), 500);
+}
+
+function openBudgetManager() {
+    let html = '<div class="row g-3">';
+    appData.expenseSources.forEach((src, idx) => {
+        html += `
+            <div class="col-6">
+                <div class="p-2 border rounded-3 bg-white">
+                    <label class="small fw-bold text-muted d-block mb-1"><i class="fas ${src.icon} me-1"></i>${src.label}</label>
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number" class="form-control" id="limit-input-${idx}" value="${src.limit || 0}">
+                    </div>
+                </div>
+            </div>`;
+    });
+    html += '</div>';
+
+    askConfirmation(
+        `<h6 class="fw-bold mb-3">Definir Límites de Gasto Mensual</h6>${html}`,
+        () => {
+            appData.expenseSources.forEach((src, idx) => {
+                const val = parseFloat(document.getElementById(`limit-input-${idx}`).value);
+                src.limit = isNaN(val) ? 0 : val;
+            });
+            saveData();
+            updateUI();
+            showToast("Presupuestos actualizados con éxito");
+        },
+        "Guardar Límites",
+        "btn-primary"
+    );
+}
 window.addEventListener('resize', () => {
     if (myChart) myChart.resize();
     if (debitPieInstance) debitPieInstance.resize();

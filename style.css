@@ -1039,3 +1039,25 @@ button:focus {
     transition: all 0.3s ease-in-out;
 }
 
+.add-category-card {
+    border: 2px dashed #dee2e6;
+    background: #f8f9fa;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s;
+    height: 100%;
+}
+.add-category-card:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    background: #fff;
+}
+
+.btn-edit-limit:hover {
+    color: #0d6efd !important;
+    opacity: 1 !important;
+    transform: scale(1.2);
+}
+.group-budget-item:hover .btn-edit-limit {
+    opacity: 0.8 !important;
+}
